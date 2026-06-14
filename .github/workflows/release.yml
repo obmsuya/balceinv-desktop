@@ -1,0 +1,102 @@
+name: Release Balce Inventory
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# Gives the workflow permission to write releases and upload assets
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-22.04, windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive   # Important because of frontend submodule
+
+      # 1. Setup Go Environment
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22' # Adjust to match your local go version if necessary
+
+      - name: Create bin directory
+        run: mkdir -p src-tauri/bin
+
+      # 2. Compile Go Sidecars from within the backend directory
+      - name: Build Go Sidecar (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          cd backend
+          go build -ldflags="-H=windowsgui -s -w" -o ../src-tauri/bin/backend-x86_64-pc-windows-msvc.exe .
+        # Note: 'cd backend' moves into your Go project folder. 
+        # '../src-tauri/bin/...' saves the output back up into the Tauri directory.
+
+      - name: Build Go Sidecar (Ubuntu)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          cd backend
+          go build -ldflags="-s -w" -o ../src-tauri/bin/backend-x86_64-unknown-linux-gnu .
+
+      - name: Build Go Sidecar (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          cd backend
+          go build -ldflags="-s -w" -o ../src-tauri/bin/backend-x86_64-apple-darwin .
+          GOARCH=arm64 go build -ldflags="-s -w" -o ../src-tauri/bin/backend-aarch64-apple-darwin .
+        # Compiles matching sidecars for both Intel and Apple Silicon Macs
+
+      # 3. Setup pnpm and Node Environment
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+
+      - name: Setup Node.js + pnpm
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22 # Required for pnpm 11's internal dependency structures
+          cache: 'pnpm'
+          cache-dependency-path: 'frontend/pnpm-lock.yaml'
+
+      # 4. Setup Rust Compilation Toolchain
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # 5. Native OS Dependency Bundling
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      # 6. Build frontend and bundle Tauri Application
+      - name: Install frontend dependencies
+        run: pnpm --prefix frontend install
+
+      - name: Build Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Balce Inventory ${{ github.ref_name }}"
+          releaseBody: "See the assets below for downloads."
+          releaseDraft: true
+          prerelease: false
