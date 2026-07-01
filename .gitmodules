@@ -1,6 +1,7 @@
 [submodule "frontend"]
 	path = frontend
-	url = https://github.com/chrisostomemataba/balceinv
+	url = https://github.com/obmsuya/balceinv.git
+
 [submodule "backend"]
 	path = backend
-	url = https://github.com/chrisostomemataba/balceinv-api
+	url = https://github.com/obmsuya/balceinv-api.git
