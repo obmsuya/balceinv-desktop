@@ -39,7 +39,7 @@ jobs:
         if: matrix.platform == 'windows-latest'
         run: |
           cd backend
-          go build -ldflags="-H=windowsgui -s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}'" -o ../src-tauri/bin/backend-x86_64-pc-windows-msvc.exe .
+          go build -ldflags="-H=windowsgui -s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledAccessTokenSecret=${{ secrets.ACCESS_TOKEN_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledRefreshTokenSecret=${{ secrets.REFRESH_TOKEN_SECRET }}'" -o ../src-tauri/bin/backend-x86_64-pc-windows-msvc.exe .
         # Note: 'cd backend' moves into your Go project folder. 
         # '../src-tauri/bin/...' saves the output back up into the Tauri directory.
 
@@ -47,13 +47,13 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           cd backend
-          go build -ldflags="-s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}'" -o ../src-tauri/bin/backend-x86_64-unknown-linux-gnu .
+          go build -ldflags="-s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledAccessTokenSecret=${{ secrets.ACCESS_TOKEN_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledRefreshTokenSecret=${{ secrets.REFRESH_TOKEN_SECRET }}'" -o ../src-tauri/bin/backend-x86_64-unknown-linux-gnu .
       - name: Build Go Sidecar (macOS)
         if: matrix.platform == 'macos-latest'
         run: |
           cd backend
-          go build -ldflags="-s -w -X 'github.com/chrisostomematabs/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}'" -o ../src-tauri/bin/backend-x86_64-apple-darwin .
-          GOARCH=arm64 go build -ldflags="-s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}'" -o ../src-tauri/bin/backend-aarch64-apple-darwin .
+          go build -ldflags="-s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledAccessTokenSecret=${{ secrets.ACCESS_TOKEN_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledRefreshTokenSecret=${{ secrets.REFRESH_TOKEN_SECRET }}'" -o ../src-tauri/bin/backend-x86_64-apple-darwin .
+          GOARCH=arm64 go build -ldflags="-s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledAccessTokenSecret=${{ secrets.ACCESS_TOKEN_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledRefreshTokenSecret=${{ secrets.REFRESH_TOKEN_SECRET }}'" -o ../src-tauri/bin/backend-aarch64-apple-darwin .
         # Compiles matching sidecars for both Intel and Apple Silicon Macs
 
       # 3. Setup pnpm and Node Environment
