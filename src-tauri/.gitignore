@@ -2,3 +2,7 @@
 # will have compiled files and executables
 /target/
 /gen/schemas
+
+# Locally-built sidecar binaries for `tauri dev` (release.yml builds these
+# fresh in CI; they should never be committed).
+/bin/
