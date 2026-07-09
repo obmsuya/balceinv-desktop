@@ -4,10 +4,8 @@ use tauri::Manager;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
-/// Holds the running sidecar's handle for the app's lifetime so it can be
-/// killed on exit. Without this, closing/restarting the app leaves the Go
-/// backend running as an orphan still bound to its port, and the next
-/// launch's sidecar fails to bind and exits immediately.
+/// Kept alive so the sidecar can be killed on exit, avoiding an orphaned
+/// process that blocks the port on the next launch.
 struct SidecarHandle(Mutex<Option<CommandChild>>);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -19,10 +17,7 @@ pub fn run() {
             hasher.update(password.as_bytes());
             hasher.finalize().to_vec()
         }).build())
-        // Logging is needed in release builds too, not just debug — a sidecar
-        // that fails to start or crashes right after starting produces no
-        // visible error otherwise; it was previously silent in every
-        // installed build.
+        // Enabled unconditionally (not just debug) so sidecar failures are visible.
         .plugin(
             tauri_plugin_log::Builder::default()
                 .level(log::LevelFilter::Info)
