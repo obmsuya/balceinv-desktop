@@ -30,6 +30,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "externalBin": [
       "bin/backend"
     ],
@@ -40,5 +41,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMyMjZEMTVBNUFGOTE2NDUKUldSRkZ2bGFXdEVtTXZ1WkxPakVFQVpxdmJNc2U4THVDSXZ1azRDY2FNbGJrQkxzSEVJQjBwQWMK",
+      "endpoints": [
+        "https://github.com/obmsuya/balceinv-desktop/releases/latest/download/latest.json"
+      ]
+    }
   }
 }
