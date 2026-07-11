@@ -9,6 +9,12 @@
       "autoPort": true
     },
     {
+      "name": "frontend-against-local-test-backend",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["API_BASE_URL=http://localhost:8099", "PORT=3000", "pnpm", "--prefix", "frontend", "run", "dev"],
+      "port": 3000
+    },
+    {
       "name": "backend",
       "runtimeExecutable": "env",
       "runtimeArgs": ["DB_PATH=/private/tmp/claude-501/-Users-chrisostomemataba-Documents-Personal-project-balceinv-desktop/e8b96031-9a15-4bfa-b82a-22a27ae370f1/scratchpad/preview-test.db", "ACCESS_TOKEN_SECRET=preview-test-secret", "REFRESH_TOKEN_SECRET=preview-test-secret", "go", "run", "."],
