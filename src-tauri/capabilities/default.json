@@ -11,6 +11,12 @@
     "shell:allow-open",
     "stronghold:default",
     "updater:default",
-    "process:allow-restart"
+    "process:allow-restart",
+    "dialog:allow-save",
+    "fs:allow-write-file",
+    {
+      "identifier": "fs:scope",
+      "allow": ["$HOME/**"]
+    }
   ]
 }
