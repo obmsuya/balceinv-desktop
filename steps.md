@@ -148,6 +148,17 @@ fixes — is preserved in git history at this same path.)
       each step in isolation. The manual hardware pass itself is still
       outstanding — see Manual follow-up below; it needs real devices this
       environment doesn't have.
+- [x] Step 6 — commit, push, and tag `v1.0.12` (2026-07-15). Also bumped
+      `src-tauri/tauri.conf.json` and `Cargo.toml` from `0.1.0` to
+      `1.0.12` — the app version had been stuck at `0.1.0` across the
+      `v1.0.10`/`v1.0.11` tags (confirmed via the actual published
+      `latest.json`), so the in-app updater could never have detected
+      those as updates regardless of the git tag. Pushed `backend` and
+      `frontend` submodules to their own remotes first, then the parent
+      repo with updated submodule pointers, then the `v1.0.12` tag —
+      triggering the `Release Balce Inventory` GitHub Actions workflow
+      (Windows/macOS/Linux matrix build) at
+      https://github.com/obmsuya/balceinv-desktop/actions/runs/29398090464
 
 ## Verification plan (fill in as each step lands)
 
