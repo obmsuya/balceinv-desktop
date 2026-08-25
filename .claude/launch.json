@@ -17,7 +17,7 @@
     {
       "name": "backend",
       "runtimeExecutable": "env",
-      "runtimeArgs": ["DB_PATH=/private/tmp/claude-501/-Users-chrisostomemataba-Documents-Personal-project-balceinv-desktop/e8b96031-9a15-4bfa-b82a-22a27ae370f1/scratchpad/preview-test.db", "ACCESS_TOKEN_SECRET=preview-test-secret", "REFRESH_TOKEN_SECRET=preview-test-secret", "go", "run", "."],
+      "runtimeArgs": ["ACCESS_TOKEN_SECRET=preview-test-secret", "REFRESH_TOKEN_SECRET=preview-test-secret", "go", "run", "."],
       "cwd": "backend",
       "port": 8080
     }
