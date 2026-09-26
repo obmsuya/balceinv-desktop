@@ -47,6 +47,15 @@ at this same path.
       reopens by itself, data kept") and the button reads "Update and
       restart".
 
+- [x] Header update indicator (`frontend/app/components/UpdateIndicator.vue`):
+      a green "Update available" pill appears only when an update exists
+      and stays until installed. Clicking it opens a card with "Update and
+      restart" and live progress ("Updating 42%"). Checks at launch, every
+      6 hours, and when the internet comes back, because POS PCs stay open
+      for days. A toast shows once per new version. Background checks
+      never flip the UI to "checking" or "error", and a failed install
+      keeps the pill so the client can retry.
+
 ## Why data is not lost during an update
 
 - The database, backups and license live in the app data folder
@@ -61,6 +70,9 @@ at this same path.
 - `cd frontend && pnpm build`: clean.
 - Release workflow YAML parses, and the matrix expands to 4 jobs.
 - Browser: `/settings?tab=updates` opens directly on the Updates tab.
+- Browser: the header pill, one-time toast and update card render in light
+  mode, and the "Updating 42%" progress state in dark mode (update state
+  set by hand, since the updater only runs inside the desktop app).
 - v1.0.17 `latest.json` inspected: signed entries for windows
   (msi/nsis), linux (AppImage/deb/rpm) and darwin-aarch64 only, which
   confirms finding 3.
