@@ -8,6 +8,18 @@ use tauri_plugin_shell::ShellExt;
 /// process that blocks the port on the next launch.
 struct SidecarHandle(Mutex<Option<CommandChild>>);
 
+fn kill_sidecar(sidecar_handle: &SidecarHandle) {
+    if let Some(child) = sidecar_handle.0.lock().unwrap().take() {
+        let _ = child.kill();
+    }
+}
+
+#[tauri::command]
+fn stop_backend(sidecar_handle: tauri::State<SidecarHandle>) {
+    kill_sidecar(&sidecar_handle);
+    std::thread::sleep(std::time::Duration::from_millis(800));
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -62,14 +74,13 @@ pub fn run() {
 
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![stop_backend])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
             if let tauri::RunEvent::Exit = event {
                 if let Some(state) = app_handle.try_state::<SidecarHandle>() {
-                    if let Some(child) = state.0.lock().unwrap().take() {
-                        let _ = child.kill();
-                    }
+                    kill_sidecar(&state);
                 }
             }
         });
