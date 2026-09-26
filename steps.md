@@ -108,3 +108,13 @@ On a real installed build (Windows and macOS):
    ID). That server is not in this repo and was not checked. If it
    filters by hardware ID, a new PC will not see the old PC's cloud
    backups; use Save to USB / file for that case.
+
+## Release
+
+- [x] Tabs restyled app-wide (underline bar, sliding brand indicator,
+      inline icons); checked in dark and light mode on Settings, Backup
+      restore tabs and Notifications.
+- [x] Pushed `backend` main (9fc4631..6c10d72), `frontend` main
+      (296a9e9..0cb1055), then the parent main (f6bab3a..72c8690), then
+      tag `v1.0.17`, which started the `Release Balce Inventory` workflow:
+      https://github.com/obmsuya/balceinv-desktop/actions/runs/36247372591
