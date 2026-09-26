@@ -203,3 +203,123 @@ at this same path.
   `1.0.18` with platforms `darwin-aarch64`, `darwin-x86_64`,
   `linux-x86_64` (AppImage, deb, rpm) and `windows-x86_64` (msi, nsis).
   Intel Macs now get updates through the updater from this version on.
+
+# Common products catalog with hidden team tools
+
+## Findings fixed
+
+- The catalog never reached clients. `backend/seeds/*.json` were empty,
+  and `services/setup.service.go` read them with a relative path that
+  does not exist next to the installed sidecar, so the "Pick from
+  Catalog" panel was always empty.
+- Seeding would have failed anyway. GORM's multi-row insert writes
+  `DEFAULT` for empty optional fields (`category`, `sub_category`),
+  which SQLite rejects (`near "DEFAULT": syntax error`). Found live and
+  covered by `repository/catalog_repository_test.go`.
+- The sales and support team had no way to load or refresh a list.
+- `handlers/catalog_handler.go` queried the database directly and
+  ignored errors.
+
+## Implementation status
+
+- [x] `backend/seeds/seeds.go` embeds `seeds/*.json` in the binary.
+- [x] `repository/catalog_repository.go`:
+  - find and count, per business type;
+  - replace, and merge by product name (ignoring case and spaces);
+  - clear;
+  - rows inserted one by one inside a transaction.
+- [x] `services/catalog_service.go`:
+  - Reads `.xlsx` and `.csv`, including semicolon CSVs and Excel's BOM.
+  - Header aliases: `product name` → name, `selling price` → price,
+    `sku` → sku prefix, `uom` → unit. Any other column becomes a detail
+    (metadata), such as strength or form.
+  - Prices like `TSh 1,500` or `500/=` are read correctly.
+  - Skips blank rows. Reports empty names, repeated names and bad
+    prices by row number.
+  - Limit of 20,000 rows. Template download.
+  - The bundled seed list is loaded at startup and at setup when the
+    shop's list is empty.
+- [x] `middleware/support.go`:
+  - The `X-Support-Passcode` header is checked against a SHA-256 hash
+    (`CompiledSupportPasscodeHash` via ldflags, or
+    `BALCE_SUPPORT_PASSCODE_HASH`).
+  - 5 wrong tries lock it for 1 minute.
+  - Returns 503 "Team tools are not set up in this build" when no hash
+    was built in.
+- [x] Routes under `/api/catalog/team` (sign-in plus passcode):
+  `GET summary`, `GET items`, `GET template`, `POST import`, `DELETE`.
+  The client-facing `GET /api/catalog` is unchanged. CORS allows the
+  new header.
+- [x] `.github/workflows/release.yml` passes
+  `secrets.SUPPORT_PASSCODE_HASH` to all four sidecar builds.
+- [x] Frontend `utils/businessTypes.ts`: one business-type list with
+  icons, now used by setup and team tools.
+- [x] Frontend `composables/useCatalog.ts`:
+  - client list cached with `useState`;
+  - team unlock, import, clear, template and "Export for bundling"
+    (JSON in the seed format);
+  - file checks before upload (type, empty, 4 MB).
+- [x] `components/catalog/TeamCatalogDialog.vue`:
+  - Passcode screen.
+  - Business-type tiles with counts and a "This shop" tag.
+  - Drop zone with inline file errors.
+  - "Add and update" or "Replace all" (red button).
+  - Result with added, updated and skipped counts, plus a skipped-rows
+    table.
+  - Searchable list preview, export, and clear with a confirm step.
+  - Closing the dialog always locks it again.
+- [x] Hidden entry: Settings → Updates → tap the version number 7 times
+  within 2.5 seconds between taps. Nothing on screen hints at it.
+- [x] `components/catalog/CatalogPicker.vue` in the add product dialog:
+  - "Pick from common products" with a count, search, and Enter picks
+    the top match.
+  - Retry on error. Hidden when the shop's list is empty.
+
+## Verification performed
+
+- `go build ./...`, `go vet` on the touched packages, and `go test ./...`:
+  - catalog parsing;
+  - seed reading;
+  - passcode lockout;
+  - SQLite replace, merge and clear.
+
+  With the insert fix reverted, the repository test fails with the same
+  `DEFAULT` error.
+- `pnpm generate` built cleanly. `nuxi typecheck` could not run here
+  because of a vue-tsc and TypeScript version mismatch in the npx cache.
+- Live API checks against a scratch backend (port 8099, scratch HOME,
+  test passcode hash):
+  - The bundled seed list loaded into an empty `retail` list at startup.
+  - No passcode gives 403. Not signed in gives 401. After 5 wrong
+    passcodes, even the right one gives 429.
+  - A messy semicolon CSV added 3 and skipped rows 4, 5 and 6 with
+    reasons. Importing it again gave 0 added and 3 updated.
+  - A file with no name column, a header-only file, an `.xls` file, a
+    business type of `../etc` and an unknown mode each gave a plain 400
+    message.
+  - The template `.xlsx` downloaded. Importing it into `retail` with
+    Replace put 3 products with strength and form details into the
+    client list.
+  - Clear removed 3. The CORS preflight allows `X-Support-Passcode`.
+  - 20,000 rows took 0.44 s to add and 0.25 s to update all of them.
+
+## Manual follow-up required
+
+1. **Set the passcode before the next release.**
+   - Pick a long passphrase for the team.
+   - Get its hash:
+     `printf %s 'the passphrase' | shasum -a 256`
+   - Add the hash as the repository secret `SUPPORT_PASSCODE_HASH`.
+   - Without it, the team dialog shows "Team tools are not set up in
+     this build".
+2. **Visual check.** The browser run was not possible in this session.
+   - In `pnpm dev`, go to Settings → Updates and tap the version 7
+     times.
+   - Check the passcode screen, tiles, drop zone, result and preview in
+     light and dark mode.
+   - Then open Products → Add Product → "Pick from common products".
+3. **Bundle curated lists.**
+   - Use "Export for bundling" to save `<type>.json`.
+   - Commit it as `backend/seeds/<type>.json`.
+   - Every new install and every existing shop with an empty list gets
+     it on the next start.
