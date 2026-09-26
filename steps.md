@@ -1,99 +1,110 @@
-# v1.0.14: Scan-with-Phone Product Photos, Payment Error Messages, Header Refresh
+# v1.0.17: Backup and Restore UI, Offline Backups, Notification and POS Fixes
 
-Previous round's plan (Excel download / printer / receipt / hardware-ID) is
-preserved in git history at this same path.
+Previous rounds are preserved in git history at this same path.
 
 ## Findings being fixed here
 
-1. Adding a product photo required the picture to already be on the POS
-   machine — no camera on POS hardware, so this meant transferring a file
-   from a phone first. (`frontend/app/pages/products/index.vue`)
-2. License/subscription payment failures showed a hardcoded generic
-   message ("Payment failed. Please try again.") instead of the real
-   reason from the payment provider, because the frontend read
-   `error.data.message` while the backend proxies Django's
-   `{"error": "..."}` body unchanged. (`frontend/app/composables/useLicense.ts`,
-   `frontend/app/components/license/PaywallOverlay.vue`)
-3. No way for a cashier to force the app to resync after something changed
-   outside its own polling (e.g. a payment confirming on the provider's
-   side, license activation landing server-side).
-   (`frontend/app/components/AppHeader.vue`)
+1. Cloud backup (`backend/backup/backup.go`) had no UI, and on its own did
+   nothing useful while the internet was down: every 6-hour run just
+   failed until the next one.
+2. No way to back up or restore without internet, and no way to move data
+   to a new PC.
+3. A restore had no undo reachable from the app (only
+   `balce.db.before-restore` on disk).
+4. Cloud network failures surfaced raw Go errors
+   (`dial tcp 127.0.0.1:8765: connect: connection refused`) to cashiers.
+5. Carried over from the previous round (now committed): notifications
+   showing "undefined", empty bell dropdown, 404 on View Product, POS
+   quantity field removing the item, image-first POS grid.
 
 ## Implementation status
 
-- [x] Backend: `POST /api/products/image-session` (protected, desktop-
-      initiated), `GET /api/image-session/:token` (public poll),
-      `GET /upload/:token` + `POST /upload/:token` (public, phone-facing) —
-      new `services/image_upload_session_service.go` (in-memory, 5-minute
-      TTL session store) and `handlers/image_upload_handler.go` (LAN IP
-      detection via stdlib `net`, self-contained mobile upload page with
-      client-side JPEG compression before it ever hits the wire).
-- [x] Found and fixed a routing bug while building this: the status-poll
-      route was first registered at `/api/products/image-session/:token`,
-      which collided with the protected `/api/products` group's route tree
-      in Fiber and got auth-gated even though it was registered outside
-      that group. Moved it to `/api/image-session/:token` — confirmed via
-      live HTTP calls, not just reading the code.
-- [x] Frontend: `useProducts.ts` gets `createImageUploadSession` /
-      `getImageUploadStatus`; `products/index.vue` shows "Scan with Phone"
-      as the default/primary image option (QR code via the new `qrcode`
-      dependency), 2s polling drops the result into the existing
-      `imagePreview` used by both add and edit flows.
-- [x] `useLicense.ts` and `PaywallOverlay.vue` now read
-      `error?.data?.error || error?.data?.message || <fallback>`, so the
-      real backend/provider error surfaces instead of the generic string.
-- [x] `AppHeader.vue`: added a Refresh button (`window.location.reload()`)
-      between the theme toggle and the sound toggle.
-- [x] Bumped `src-tauri/tauri.conf.json`, `Cargo.toml`, `Cargo.lock` to
-      `1.0.14`; pushed `backend` and `frontend` submodules to their own
-      remotes, then the parent repo with updated submodule pointers, then
-      the `v1.0.14` tag — triggering the `Release Balce Inventory` GitHub
-      Actions workflow (Windows/macOS/Linux matrix build) at
-      https://github.com/obmsuya/balceinv-desktop/actions/runs/32880786514
+Backend (`backend/`, on `main`):
+- [x] Moved the two cloud-backup commits from a detached HEAD onto `main`
+      (remote history had been rewritten with the noreply author; trees
+      were identical).
+- [x] `backup/local.go`: daily gzipped `VACUUM INTO` snapshot at
+      `<app data>/backups/balce-YYYY-MM-DD.db.gz`, last 7 kept; export to
+      a chosen `.gz` path (USB); restore from a local date or a file path.
+- [x] Before-restore safety copy in its own slot
+      (`balce-before-restore.db.gz`) so the automatic backup after the
+      restart cannot overwrite it; every restore except the undo itself
+      takes it first.
+- [x] `backup/status.go`: one status call with local backups, last cloud
+      attempt/success/error, pending restore, before-restore copy.
+- [x] Automatic loop saves on this PC first, then retries the cloud every
+      15 minutes while it fails, instead of waiting 6 hours.
+- [x] `ErrCloudUnreachable` + `UserFacingCloudError`: plain "could not
+      reach the cloud, check the internet connection", HTTP 503; full
+      error still logged.
+- [x] Routes under one `/api/backup` group: `GET /status`,
+      `POST /local`, `POST /local/restore`, `POST /export`, `POST /import`,
+      plus the existing `/cloud`, `/cloud/restore`. Restore, export and
+      import are admin-only.
+
+Frontend (`frontend/`, on `main`):
+- [x] `useBackup.ts` composable; toasts fire only after awaited results.
+- [x] Settings → Backup tab (`components/backup/BackupPanel.vue`): status
+      tiles for this PC and cloud (offline / no license / last error),
+      Back up now, Save to USB / file, Restore tabs (On this PC, Cloud,
+      From a file), Undo last restore, pending-restore banner, confirm
+      dialog, full-screen "Preparing your backup" overlay.
+- [x] After a restore the desktop app signs out and relaunches itself so
+      the backend applies the restore on start.
+
+Shell (`src-tauri/`):
+- [x] `dialog:allow-open` capability for the restore-from-file picker.
 
 ## Verification performed
 
-- `cd backend && go build ./... && go vet ./...` — clean.
-- `cd frontend && pnpm build` — clean, twice (once for the phone-upload
-  feature, once for the header refresh button).
-- `cd src-tauri && cargo check` — clean at `v1.0.14`.
-- Phone-upload feature exercised end-to-end against the real running app,
-  not just built: logged into a fresh trial install, opened Add Product,
-  clicked "Scan with Phone", confirmed the QR encodes a real LAN URL
-  (`http://192.168.x.x:8080/upload/<token>`), opened that exact URL in a
-  second browser tab standing in for the phone, POSTed a real image to the
-  live endpoint, and watched the desktop's poll pick it up and populate
-  `imagePreview` automatically — the full loop, not just each half in
-  isolation.
-- Header refresh button clicked in the live app; confirmed via the Nuxt
-  DevTools boot banner logging a second time and every bootstrap API call
-  (license status, permissions, products, print status) re-firing that
-  it's a genuine full reload, not a cosmetic spinner. The cart's Amount
-  field surviving the reload is the cart-persistence feature working
-  correctly, not evidence the reload didn't happen.
-- Payment error message fix verified against real production log output
-  (an actual failed AzamPay checkout returning `"Invalid Vendor"`) showing
-  the frontend previously discarded that message in favor of the generic
-  fallback; the field-name fix (`error?.data?.error`) is a one-line change
-  with no other logic branches to verify.
+- `cd backend && go build ./... && go vet ./backup ./handlers ./routes &&
+  go test ./...`: clean. New tests cover local write/prune/restore,
+  rejection of `../` names and non-database files, export → restore from
+  file, the before-restore copy surviving a daily backup and restoring,
+  and the unreachable-cloud message.
+- `cd frontend && pnpm build`: clean.
+- `cd src-tauri && cargo check`: clean.
+- Live end-to-end in the browser against a scratch backend (scratch HOME,
+  locally signed test license, a fake licensing/R2 server on
+  127.0.0.1:8765, nothing sent to production):
+  - Back up now → `POST /local` then `POST /cloud`, toast "Backup saved
+    on this PC and in the cloud".
+  - Added a product, restored today's local copy, restarted backend →
+    product gone. Undo last restore, restart → product back.
+  - Stopped the fake cloud → Back up now saved locally and showed "could
+    not reach the cloud, check the internet connection. It will be
+    retried automatically."; tile shows "Cloud can't be reached right
+    now".
+  - Cloud back → uploaded; added a product, restored from the Cloud tab,
+    restarted → product gone.
+  - `POST /export` wrote a `.gz` file; `/etc/passwd` rejected; a fake
+    `.gz` rejected on import; a real export staged and showed the
+    pending-restore banner.
+  - Found and fixed during this run: "Restore and restart" did nothing,
+    because closing the dialog cleared the selected backup before the
+    click handler read it.
+- At 1024px wide the Backup tab has no horizontal overflow. Below about
+  900px the whole app overflows because of the shell's fixed `ml-64`
+  sidebar margin. That is not new in this change.
 
 ## Manual follow-up required
 
-- Scan-with-phone: this session verified the mechanism with a second
-  browser tab standing in for the phone (real LAN IP, real HTTP round
-  trip). Nobody has scanned the QR with an actual phone camera yet — worth
-  one real run to confirm the OS-level "open this link" prompt behaves as
-  expected on both iOS and Android, and that a real camera photo (larger,
-  different orientation/EXIF data than the synthetic test image used here)
-  compresses and uploads cleanly.
-- Scan-with-phone requires the phone and POS machine to be on the same
-  Wi-Fi network without AP/client isolation. Worth confirming the shop's
-  actual Wi-Fi setup allows this before relying on it as the default —
-  if isolation is on, the QR will generate but the phone will fail to
-  connect, and there's no in-app detection for that case today.
-- The separate `wapangajikiganjani` Django backend (payment/license
-  activation server at `backend.wapangaji.com`) has its own bug fixes from
-  this same session — the `AzamPayTransaction.user=None` NOT NULL crash,
-  the broken callback-forwarding key mismatch, and the Balce SMS
-  notification gap. Those are a different repo/deployment, not part of
-  this tag, and need their own deploy.
+On a real installed build (Windows and macOS):
+1. Settings → Backup → Restore any backup. The app must sign out,
+   relaunch by itself, and show the restored data after login. On
+   Windows, check that the restore is applied on the first relaunch. If
+   the old backend process still holds `balce.db` at that moment, the
+   banner will say a restore is waiting; click Restart now once more.
+2. Save to USB / file with a USB stick plugged in: pick the stick in the
+   save dialog and check that the `.db.gz` file appears on it. Then, on a
+   second PC, set up Balce, go to Settings → Backup → From a file, pick
+   that file, and confirm the data arrives.
+3. Unplug the network, wait for or click Back up now: the Cloud tile says
+   Offline or can't be reached, and "On this PC" updates. Reconnect.
+   Within 15 minutes of the next automatic run the cloud copy should
+   upload.
+4. Moving to a new PC through the cloud depends on how
+   `backend.wapangaji.com` lists backups (by license key or by hardware
+   ID). That server is not in this repo and was not checked. If it
+   filters by hardware ID, a new PC will not see the old PC's cloud
+   backups; use Save to USB / file for that case.
