@@ -69,12 +69,13 @@ at this same path.
 
 ## Manual follow-up required
 
-1. Windows PC on v1.0.17 (installed with the `-setup.exe`): open
-   Balce and wait for the "Update available" toast, then click View →
-   Update and restart. Expect: the installer progress bar with no
-   "Error opening file for writing" box, then the app reopens on v1.0.18
-   with the same sales and products. Check in Task Manager that exactly
-   one `backend.exe` is running afterwards.
+1. Windows PC on v1.0.17 (installed with the `-setup.exe`). This PC still
+   runs v1.0.17's updater code, so in Settings → Updates click "Check for
+   Updates" first and then "Download Update". Expect: the installer
+   progress bar with no "Error opening file for writing" box, then the
+   app reopens on v1.0.18 with the same sales and products. Check in Task
+   Manager that exactly one `backend.exe` is running afterwards. From
+   v1.0.18 on, the toast → "Update and restart" path works in one click.
 2. Windows PC installed with the `.msi`: same test. The NSIS hook does
    not apply to MSI. Updates from v1.0.17 may ask for a reboot to replace
    `backend.exe`; from v1.0.18 on, `stop_backend` handles it.
