@@ -39,15 +39,6 @@ jobs:
         with:
           go-version: '1.22' # Adjust to match your local go version if necessary
 
-      - name: Check team passcode hash
-        shell: bash
-        env:
-          SUPPORT_PASSCODE_HASH: ${{ secrets.SUPPORT_PASSCODE_HASH }}
-        run: |
-          if [[ ! "$SUPPORT_PASSCODE_HASH" =~ ^[0-9a-f]{64}$ ]]; then
-            echo "::warning::SUPPORT_PASSCODE_HASH is not a 64-character SHA-256 hash, the team tools will not unlock in this build"
-          fi
-
       - name: Create bin directory
         run: mkdir -p src-tauri/bin
 
