@@ -190,3 +190,16 @@ at this same path.
 - Confirm the prefix → network map with the sales team (Vodacom
   074/075/076, Tigo 065/067/071/077, Airtel 068/069/078, Halotel
   061/062). The cashier can always change the network by hand.
+
+# Release v1.0.18
+
+- Pushed backend `6c10d72..9706426`, frontend `0cb1055..222f9ae`, parent
+  `7557908..450ffea`, then the annotated tag `v1.0.18`.
+- Release run: https://github.com/obmsuya/balceinv-desktop/actions/runs/36250028047
+  finished with all 4 jobs green: ubuntu-22.04, windows-latest,
+  macos-latest `aarch64-apple-darwin`, and the new macos-latest
+  `x86_64-apple-darwin`.
+- `gh release download v1.0.18 -p latest.json -O -` shows version
+  `1.0.18` with platforms `darwin-aarch64`, `darwin-x86_64`,
+  `linux-x86_64` (AppImage, deb, rpm) and `windows-x86_64` (msi, nsis).
+  Intel Macs now get updates through the updater from this version on.
