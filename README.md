@@ -85,6 +85,67 @@ pnpm --prefix frontend install
 ```bash
 pnpm tauri dev
 ```
+---
+
+## 🧰 Team Tools: Common Products
+
+Sales and support staff load lists of common products (medicines for pharmacies, tools for hardware stores, …). Shops then pick from the list when they add a product, so the name, unit, category and price fill in by themselves. Shop staff never see the upload screen, only the finished list.
+
+### Opening the team screen
+
+1. Sign in to the POS with any account.
+2. Go to **Settings → Updates**.
+3. Tap the **version number** 7 times quickly.
+4. Enter the team passphrase and press **Unlock**.
+
+> 🔒 The passphrase is never written in this repository, because the repository is public. Ask the product owner for it and keep it in a private team note.
+
+After 5 wrong passphrases the screen waits one minute. Closing the screen, or pressing **Lock**, locks it again.
+
+### Preparing the file
+
+Use Excel (`.xlsx`) or CSV (`.csv`), up to 4 MB and 20,000 rows. Old `.xls` files must be saved again as `.xlsx`. Press **Get template** on the team screen for a ready example.
+
+| Column | Required | Also accepted as | Example |
+| :--- | :--- | :--- | :--- |
+| `name` | Yes | product, product name, item | Paracetamol 500mg |
+| `category` | No | | Pain relief |
+| `sub_category` | No | subcategory | Tablets |
+| `unit` | No (default `pcs`) | uom | strip |
+| `sku_prefix` | No (default `GEN`) | sku, code | PARA |
+| `default_price` | No | price, selling price | 1,500 or TSh 1,500 |
+
+Any other column, such as `strength` or `form`, is kept as a product detail. Blank rows are ignored. Rows with no name, a repeated name, or a price that is not a number are skipped, and the screen lists each one with its row number.
+
+### Uploading
+
+1. Pick the **business type**. The shop's own type is marked **This shop**.
+2. Drop the file in, or click to choose it.
+3. Choose how to save it:
+   * **Add and update**: new names are added, and names already in the list are updated. Names are matched ignoring capital letters and extra spaces.
+   * **Replace all**: the whole list for that business type is replaced by the file.
+4. Press **Upload**. Check the added, updated and skipped counts, then the list preview below.
+
+### Shipping a list with the app
+
+Lists uploaded on one PC stay on that PC. To give a list to every shop:
+
+1. Press **Export for bundling** and save the file (for example `pharmacy.json`).
+2. Commit it as `backend/seeds/<business type>.json`.
+3. Release a new version. New installs, and existing shops whose list for that type is empty, get it on their next start.
+
+### Setting or changing the passphrase
+
+The app stores only a SHA-256 hash of the passphrase, built in at release time from the repository secret `SUPPORT_PASSCODE_HASH`.
+
+```bash
+printf %s 'the passphrase' | shasum -a 256
+```
+
+Save the output as the `SUPPORT_PASSCODE_HASH` secret, then release a new version. A build without the secret shows "Team tools are not set up in this build". For local development, set `BALCE_SUPPORT_PASSCODE_HASH` to the hash before starting the backend.
+
+---
+
 🚀 Automated CI/CD Engine
 App releases are handled dynamically through GitHub Actions via .github/workflows/release.yml. The build flow is strictly tag-scoped:
 
