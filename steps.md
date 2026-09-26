@@ -97,3 +97,96 @@ at this same path.
    exists.
 4. Linux: AppImage and `.deb` install, then update. The `.deb` path asks
    for the admin password (the updater runs `dpkg -i`).
+
+# Subscription payment audit and redesign (also in v1.0.18)
+
+## Findings fixed
+
+1. False "Payment received" during a trial or grace period: the old poll
+   read `/api/license/status`, which already said `licensed: true`, so it
+   passed within 4 s whether or not anything was paid, and nothing asked
+   the server for the new expiry until the next app start.
+2. Trial and grace banners were never visible: `fixed top-0 z-40` sat
+   under the header (`fixed top-0 z-50`).
+3. The grace banner showed days since expiry as "days left"
+   (`Math.abs(days_remaining)`). Expired 1 day ago displayed "1 day left",
+   when 4 remained.
+4. "Subscribe" during a trial opened an empty plan list, because plans
+   were only fetched when the app was locked.
+5. A PC with a wrong date got "subscription expired" instead of "fix the
+   date".
+6. Stuck states: no way out of the 90 s waiting screen, "Check again"
+   could start parallel polls, and no sign-out on the lock screen, so a
+   cashier could not switch to an admin.
+7. After an unlock, pages that failed with 402 stayed empty, and raw
+   "license expired on …" error toasts stacked above the lock screen.
+8. Friction: phone numbers with spaces or +255 were rejected, the network
+   was picked from a dropdown, and the prompt said "MNO PIN".
+
+## What changed
+
+- Backend `license.CurrentStatus()`: one calculation with rounded-up days,
+  real `grace_days_remaining`, and `lock_reason` (missing / expired /
+  clock). New `POST /api/license/refresh` asks the server for this
+  device's license (works while locked). Activation never replaces a
+  paid license with an older one, and "offline" is a typed error with a
+  plain message. The pay proxy validates phone, network and plan, and
+  server 5xx or HTML answers become one plain sentence.
+- Payment flow: Plan → Pay → Confirm. Plans get tiered icons (sprout /
+  trees / crown), price per month, "Current" and "Best value" tags. The
+  phone field is focused automatically, accepts any format, and formats
+  as you type. Network buttons in each network's colour are picked from
+  the prefix. The waiting screen has a timer, "Send again" after 30 s,
+  and Cancel. Success is declared only when the server reports a new or
+  longer license. "Not confirmed yet" warns not to pay twice.
+- Lock screen: a reason-specific message, a payment flow for admins,
+  "Sign in as admin" for cashiers, a copyable device ID, and sign-out.
+  After any unlock it shows "All set" and reloads.
+- Header: a card icon with a days-left badge (amber for trial or ending
+  within 7 days, red for grace), a popover with Subscribe / Renew now,
+  and one grace warning per session.
+- Any 402 from the API re-checks the license at once, and toasts are
+  hidden while the lock screen is up.
+- The brand name was replaced with "POS" in all user-facing text. The
+  installer product name and internal IDs were kept, because changing
+  them would move the install folder and orphan existing data.
+
+## Verification performed
+
+- `go test ./license ./backup`: all license states (missing, paid,
+  5 hours left, grace, expired, trial, clock set back), activation
+  (trial upgrade, renewal saved, older copy ignored, offline detected).
+- `node frontend/scripts/mobileMoney.check.ts`: phone normalizing for
+  `0712…`, `+255 712…`, `255…`, `712…`, and bad input; network
+  detection; duration and price formatting.
+- `pnpm build`: clean.
+- Live in the browser against the scratch backend and a fake licensing
+  server that confirms payments 12 s after the request:
+  - Trial: amber badge "10" → Subscribe → plans listed → `+255 754 123 456`
+    became `0754 123 456` with M-Pesa auto-picked → still waiting at 6 s
+    (no false success) → "Payment received, active until 26 October"
+    after confirmation. The badge disappeared.
+  - Grace: red badge "4" and a one-time warning with Renew. A declined
+    payment showed the server's reason ("Insufficient balance…"). Typing
+    and Enter worked with no clicks.
+  - Expired: lock screen with plans, no stray toasts. Paying Quarterly
+    with `688123456` (Airtel auto-picked) → "All set" → the app reloaded
+    unlocked with data.
+  - Wrong clock: the "computer's date is wrong" screen with Check again,
+    and no payment option.
+  - Licensing server down while locked: "No internet connection…" with
+    Try again.
+  - Cashier while locked: "Ask the owner or an admin", with a Sign in as
+    admin button.
+  - Plan tiles checked in light and dark mode.
+
+## Manual follow-up required
+
+- One real payment against production (`backend.wapangaji.com`) from a
+  trial PC and from an expired PC, to confirm that
+  `/balce/license/by-hardware/` returns the new expiry soon after the
+  mobile money callback. The flow waits up to 2 minutes, then offers
+  Check again.
+- Confirm the prefix → network map with the sales team (Vodacom
+  074/075/076, Tigo 065/067/071/077, Airtel 068/069/078, Halotel
+  061/062). The cashier can always change the network by hand.
