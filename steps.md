@@ -1,325 +1,739 @@
-# v1.0.18: Smooth In-App Updates on Every Platform
+# Steps: multi-tenant revamp (2026-09-29)
 
-Previous rounds (v1.0.17 backup/restore, tabs) are preserved in git history
-at this same path.
+Goal: `goal.md`. Background: `architecture.md`. Previous rounds are in git
+history at this path.
 
-## Findings being fixed here
+## Where to start
 
-1. "Download Update" in Settings did nothing after the header's automatic
-   check found an update. The found `Update` object lived in a per-call
-   `let` inside `useUpdater()`, so the header's copy had it and the
-   Settings page's copy was `null`, and `downloadAndInstall` returned
-   silently. (`frontend/app/composables/useUpdater.ts`)
-2. Windows: the updater leaves the app with `std::process::exit(0)`
-   (tauri-plugin-updater 2.10.1 `updater.rs:865`), which skips our
-   `RunEvent::Exit` handler, so the Go sidecar `backend.exe` kept running.
-   The NSIS installer only asks Restart Manager to close
-   the main app executable (`CheckIfAppIsRunning`), so copying the locked
-   `backend.exe` failed with "Error opening file for writing", or the old
-   backend kept serving the new UI. (`src-tauri/src/lib.rs`, installer)
-3. Intel Macs had no installer and no update: the release matrix built
-   only for the runner's arch, and `latest.json` had only
-   `darwin-aarch64`. (`.github/workflows/release.yml`)
-4. The "Update available" toast opened Settings on the Business tab, and
-   the download showed no progress or explanation.
+Two tracks run in parallel:
+- **Track S (server)** starts once the owner has installed the SSH key
+  (S1).
+- **Track A (app)** starts with Phase 0 on a `revamp` branch in both the
+  `backend/` and `frontend/` submodules. `main` keeps building the current
+  desktop app until Phase 9 swaps the entry point.
 
-## Implementation status
+## Rules for every phase
 
-- [x] `pendingUpdate` moved to module scope, and `downloadAndInstall`
-      re-checks if it is missing.
-- [x] Install flow: download with a % progress bar → save a backup on
-      this PC (`useBackup().saveBackupOnThisPC`) → on Windows
-      `invoke('stop_backend')` → `update.install()` → relaunch. If install
-      fails after the backend was stopped, the app relaunches so the
-      backend comes back.
-- [x] `stop_backend` Tauri command kills the sidecar and waits 800 ms.
-- [x] NSIS `NSIS_HOOK_PREINSTALL` (`src-tauri/windows/hooks.nsh`) stops
-      the `backend.exe` whose path is `$INSTDIR\backend.exe`, before any
-      file is copied. This runs inside the new installer, so it also fixes
-      updates started from v1.0.17 and older, whose updater code cannot
-      change.
-- [x] Release matrix builds `aarch64-apple-darwin` and
-      `x86_64-apple-darwin` separately; Rust targets installed on macOS
-      runners.
-- [x] Update toast and header check open `/settings?tab=updates`;
-      settings tabs follow `?tab=`.
-- [x] Updates card explains what happens ("backup first, closes and
-      reopens by itself, data kept") and the button reads "Update and
-      restart".
+- **Vertical slices.** Each phase lands migration → domain → dto →
+  repository → service → handler → routes → frontend composable/page,
+  and the phase isn't done until its pages work end to end.
+- **Pages not yet ported stay hidden** from navigation through one list in
+  the frontend nav config. The list shrinks every phase and is deleted in
+  Phase 9.
+- **No inline code comments** (owner's standing rule). The reasoning lives
+  in this file and in commit messages.
+- **Backend tests run on both engines:** SQLite always, Postgres when
+  `TEST_DATABASE_URL` is set (local `docker compose -f dev/compose.yml up
+  -d`).
+- **Tests every phase repeats for its own endpoints**, on top of the
+  phase-specific edge cases:
+  - unauthenticated → 401
+  - missing permission → 403
+  - other company's id in the URL → **404** (never reveal that it exists)
+  - other company's id inside a body → 404/400, nothing written
+  - invalid DTO → 400 with field errors
+  - list endpoints: `limit` 0/−1/101/non-numeric clamp to the allowed
+    range; `offset` beyond the end gives an empty page; query count ≤ 3
+  - a write that fails halfway leaves nothing behind (request transaction
+    rollback)
+- **Frontend gate every phase:** `pnpm build`, `pnpm generate`, then the
+  phase's pages checked in the preview browser in light, dark and 375 px
+  width, with no console errors, before the box is checked.
+- Record the commands actually run under each phase's **Verification
+  performed**. Nothing is claimed without them.
 
-- [x] Header update indicator (`frontend/app/components/UpdateIndicator.vue`):
-      a green "Update available" pill appears only when an update exists
-      and stays until installed. Clicking it opens a card with "Update and
-      restart" and live progress ("Updating 42%"). Checks at launch, every
-      6 hours, and when the internet comes back, because POS PCs stay open
-      for days. A toast shows once per new version. Background checks
-      never flip the UI to "checking" or "error", and a failed install
-      keeps the pill so the client can retry.
+---
 
-## Why data is not lost during an update
+## Track S: cloud server (`140.99.254.193`, host `faltasi`)
 
-- The database, backups and license live in the app data folder
-  (`%APPDATA%\com.balceinv.app`, `~/Library/Application Support/com.balceinv.app`,
-  `~/.config/com.balceinv.app`). Installers only replace program files.
-- A fresh local backup is saved right before installing.
-- The in-progress cart is kept in webview storage, which survives updates.
+Files live in the backend repo under `deploy/` (balceinv-api PR #6), so
+the server can be rebuilt from the repo.
 
-## Verification performed
+**The server is shared.** It also runs **faltasi-wealth** (FastAPI +
+Postgres 15 + Redis, served at `faltasi.wapangaji.com` through nginx with a
+Cloudflare Origin Certificate) and **Woodpecker CI**. Hardware: Ubuntu
+25.04, 1 vCPU, 2 GB RAM, 28 GB disk.
 
-- `cd src-tauri && cargo check`: clean.
-- `cd frontend && pnpm build`: clean.
-- Release workflow YAML parses, and the matrix expands to 4 jobs.
-- Browser: `/settings?tab=updates` opens directly on the Updates tab.
-- Browser: the header pill, one-time toast and update card render in light
-  mode, and the "Updating 42%" progress state in dark mode (update state
-  set by hand, since the updater only runs inside the desktop app).
-- v1.0.17 `latest.json` inspected: signed entries for windows
-  (msi/nsis), linux (AppImage/deb/rpm) and darwin-aarch64 only, which
-  confirms finding 3.
-- Read the plugin and NSIS template sources to confirm findings 1 and 2
-  (not reproduced on a Windows machine in this session).
+### S1: key-only SSH access
+- [x] Owner ran `ssh-copy-id`; key login verified with `BatchMode=yes`.
+- [x] Inventory recorded (above). Everything below is sized for 2 GB RAM.
+
+### S2: OS hardening
+- [x] fwupd stopped and masked (it held about 600 MB of RAM).
+- [x] 1 GB swap file, `vm.swappiness=10`. Timezone was already UTC.
+- [x] **Password SSH stays enabled, by the owner's decision** (a
+      non-technical client needs it). ufw rate-limits port 22 instead.
+- [x] Package updates: 35 upgraded (including Docker 29.2.1); every
+      container came back and faltasi answered 200 locally and through
+      Cloudflare. Unattended upgrades on, security channel only, no
+      automatic reboot.
+- [ ] Reboot pending for kernels 6.14.0-35 to -37 and libc (they were
+      installed before this round). Ask the owner before rebooting.
+- [ ] Ubuntu 25.04 has had no security updates since January 2026.
+      Upgrade to 26.04 LTS later, **after a provider snapshot**, in a
+      maintenance window (runbook to be written).
+
+### S3: firewall
+- [x] ufw: default deny incoming, `limit 22/tcp`, allow 80/tcp and 443/tcp.
+- [x] Docker bypasses ufw, so the other apps' published ports were
+      rebound to `127.0.0.1`: faltasi Postgres 5432, Redis 6379 and API
+      8000, and Woodpecker 8001. The original compose files are saved in
+      `/root/balce-preflight-20260929/`. Woodpecker's UI is now reached
+      with `ssh -L 8001:127.0.0.1:8001 root@140.99.254.193`.
+- [x] External scan from the Mac: 22/80/443 open; 5432, 6379, 8000, 8001,
+      3900, 3901 and 3903 closed.
+
+### S4: Docker
+- [x] Docker was already installed. Unused images and build cache pruned:
+      disk went from 8.3 GB to 18 GB free.
+- [x] Log rotation is set per service in the compose files (10 MB × 3).
+      `daemon.json` is left alone, because changing it means restarting
+      every container on the box.
+
+### S5: base stack
+- [x] `/opt/balce`: `postgres:17.11-alpine` (256 MB limit, tuned for small
+      RAM) and `dxflrs/garage:v2.4.1` (128 MB limit) on an `internal: true`
+      network; both healthy. Measured: Postgres 36 MiB, Garage 5 MiB.
+- [x] Roles checked: `balce_owner` owns database and schema; `balce_app`
+      can connect, isn't superuser, can't bypass RLS and can't create
+      tables; PUBLIC can't connect.
+- [x] Garage: single-node layout applied, bucket `balce-media`, key
+      `balce-api` stored in `.env.prod`.
+- [x] Proxy: nginx replaced by Caddy (`/opt/proxy`, host network, one site
+      file per app in `/opt/proxy/sites/`). faltasi is kept, and its site
+      file `faltasi.caddy` lives only on the server, serving the same
+      Cloudflare Origin Certificate from `/etc/ssl`, the same two security
+      headers, and proxying to `127.0.0.1:8000`. Switch-over took 2 s,
+      with a script that would have restarted nginx if faltasi hadn't
+      answered 200 within 30 s. nginx packages removed (not purged; config
+      still in `/etc/nginx` and in the preflight copy). Caddy uses 10 MiB.
+      The Balce site file is added in the deploy round, once the domain
+      exists.
+
+### S6: secrets in `.env.prod`
+- [x] `init-secrets.sh` created `/opt/balce/.env.prod` (`600`, root) with
+      five generated values; the Garage key was added by
+      `garage-setup.sh`. No value was ever printed.
+
+### S7: backups
+- [x] `backup.sh` (7 daily, 4 weekly), with cron at 02:30 UTC.
+- [x] `restore-drill.sh` restores into `balce_restore_check`, compares row
+      counts, then drops it.
+- [x] `pull-backups.sh` tested from the Mac.
+- Dropped from the plan: a copy of the backups into Garage. It sits on the
+  same disk, so it adds nothing; the off-box pull is the real protection.
+
+### S8: deploy script
+- [x] `deploy.sh --dry-run` prints every step; the linux/amd64 static build
+      compiles. The first real deploy happens once Phase 1 adds the `api`
+      service.
+
+#### Incident during S3 (2026-09-29)
+Rebinding faltasi's ports recreated its containers. The backend refuses to
+start without Redis, and Redis had been crash-looping since July 20 on a
+6-byte corrupt `dump.rdb` (an internet-exposed Redis without a password; a
+truncated dump is a common sign of tampering). faltasi returned 502 for a
+few minutes. With the owner's approval the corrupt file was deleted and
+Redis restarted empty; `/`, `/docs` and `/health` returned 200 again, also
+through Cloudflare.
+
+#### Owner instructions: secrets
+- Read a value: `ssh root@140.99.254.193 "grep ^KEY= /opt/balce/.env.prod"`.
+- Rotate a value: edit it with `nano /opt/balce/.env.prod`, then run
+  `docker compose --env-file .env.prod -f docker-compose.prod.yml up -d`
+  in `/opt/balce`. Database passwords must also be changed inside
+  Postgres with `ALTER ROLE … PASSWORD`.
+- Never commit `.env.prod`, never paste it into chat, and keep a copy in a
+  password manager.
+
+**Verification performed (Track S, 2026-09-29):**
+- `free -m`: available 447 MB → 974 MB after fwupd and swap (1,072 MB after
+  the Balce stack started).
+- `df -h /`: 8.3 GB → 18 GB free after the prune.
+- `ufw status`, `ss -tlnp`, and `nc -z` from the Mac on 10 ports (results
+  above).
+- `curl` through Cloudflare: `https://faltasi.wapangaji.com/health` → 200.
+- Caddy switch-over: `/`, `/docs`, `/health` and `/openapi.json` return the
+  same status and byte size as under nginx; `X-Frame-Options` and
+  `X-Content-Type-Options` still present; `http://` → 308 to `https://`;
+  only Caddy listens on 80/443; `caddy validate` passed before the switch.
+- Reboot readiness: `docker` and `containerd` enabled; every container has
+  an `always` or `unless-stopped` restart policy.
+- `docker inspect` health: `balce-postgres` and `balce-garage` healthy.
+- `pg_roles` and `has_*_privilege` queries (results above).
+- `backup.sh` → 2 KB dump; `restore-drill.sh` → "row counts match (0
+  tables)"; `pull-backups.sh` → the dump landed on the Mac.
+
+---
+
+## Phase 0: backend foundation
+
+Branch `revamp` in `backend/`. The old GORM code stays untouched and
+building until Phase 9. The new config lives in `internal/config` because
+the old `config/` package is still in use; it moves in Phase 9.
+
+- [x] `dev/compose.yml`: local Postgres 17 on `127.0.0.1:55432`.
+- [x] `internal/config`: godotenv; Postgres when `DATABASE_URL` is set,
+      otherwise SQLite at `DB_PATH` or the app data folder; setting both is
+      rejected; `ALLOWED_ORIGINS` required in cloud; `LISTEN_ADDR` default
+      `127.0.0.1:8080`; every problem reported together.
+      `.env.example` added.
+- [x] `internal/common/database`: Postgres (pgx stdlib, max 10 conns) or
+      SQLite (modernc; WAL, `foreign_keys`, `busy_timeout(5000)`,
+      `synchronous(NORMAL)`; a one-connection writer with immediate
+      transactions, plus a four-connection `query_only` reader); `Querier`
+      interface; `CountingQuerier` for N+1 tests. The dialect helper is
+      deferred until the first query that differs.
+- [x] Migrations: golang-migrate with embedded `migrations/postgres` and
+      `migrations/sqlite`, run on a short-lived connection before the pools
+      open; a dirty version stops startup with instructions; SQLite is
+      copied with `VACUUM INTO` before pending migrations run. First
+      migration: `companies`.
+- [x] `internal/common/logging`: slog text, dated file + stdout, time of
+      day only, `WriteSeparator` after each request.
+- [x] `internal/common/response`: `{success, message, data}`; errors add
+      `code` and `requestId`; `ValidationError` with field list; `Page`.
+- [x] `internal/common/httpx`: request ID + access log; request
+      transaction (reader for GET/HEAD, read-only on Postgres; writer
+      otherwise; rollback on error, panic, or status ≥ 400); error handler
+      that logs 5xx once; pagination clamp.
+- [x] `cmd/server/main.go` (under 100 lines) and `internal/server.New`:
+      config → logging → migrate → open → Fiber (recover, helmet, CORS from
+      config) → `/health` → graceful shutdown.
+- [x] `internal/testkit`: every test runs on SQLite (inside a folder named
+      `Application Support`, to cover paths with spaces) and on a fresh
+      Postgres database per test when `TEST_DATABASE_URL` is set.
+
+**Edge-case tests:**
+- [x] Migrations up → repeat up (no-op, no copy) → down → up, both engines.
+- [x] Time round-trip (UTC, microseconds) and UUIDv7 round-trip, both
+      engines.
+- [x] `SELECT $2, $1` binds by number on SQLite as on Postgres.
+- [x] 50 concurrent read-then-write transactions on SQLite: zero lock
+      errors, 50 rows.
+- [x] Writes followed by 409, a returned error, or a panic leave no row; the
+      next write still succeeds (no leaked writer connection); a write
+      inside GET fails with 500 on both engines; every error body carries
+      a `requestId`.
+- [x] Pagination clamps `0`, `-1`, `abc`, `101` and a negative offset.
+- [x] `/health` gives 200 live and 503 after the database closes;
+      `X-Request-Id` on every response.
+- [x] Config: both databases → error; cloud without origins → error; both
+      problems reported in one error; desktop defaults; origin list
+      trimming.
+- [ ] Pre-migration copy is created when a migration is pending (moved to
+      Phase 1; it needs a second migration to exist).
+
+**Verification performed (2026-09-29):**
+- `docker compose -f dev/compose.yml up -d --wait` → Postgres healthy.
+- `go build ./...` → old and new code both compile.
+- `go vet ./internal/... ./cmd/... ./migrations/...` → clean.
+- `TEST_DATABASE_URL=postgres://balce:…@127.0.0.1:55432/balce go test
+  -count=1 -v ./internal/...` → every subtest passes on **sqlite and
+  postgres**. The first run caught a real bug: migrations ran before the
+  SQLite folder existed, so a first desktop launch into a new app data
+  folder would have failed. Fixed with `ensureSqliteDirectory` in both
+  open paths.
+- `go test ./backup/... ./license/... ./services/... ./repository/...
+  ./middleware/...` → the old code's tests still pass after the dependency
+  upgrade.
+- Smoke run: `go build ./cmd/server`, started with `DB_PATH` inside a
+  folder containing a space → `GET /health` 200
+  `{"data":{"engine":"sqlite"}}`, `logs/2026-09-29.log` created, SIGTERM →
+  "shutting down" and a clean exit.
+- Toolchain note: modernc/sqlite 1.60 needs Go 1.26, so `go.mod` now says
+  1.26. CI's `setup-go` resolves it automatically; CLAUDE.md is updated in
+  Phase 9.
+
+---
+
+## Phase 1: tenancy core and auth (first usable slice: set up, log in, manage users)
+
+Backend: balceinv-api PRs #7 (schema), #8 (auth, users, roles), #9 (admin
+command and legacy-database guard). Frontend: balceinv PR #1.
+
+**Schema** (both engines, one pair of files per table):
+- [x] `shops`, `permissions` (40 seeded `resource:action` rows),
+      `roles` (one owner role per company), `role_permissions`, `users`,
+      `user_permissions`, `user_shops`, `sessions` (hash only),
+      `login_attempts`.
+- [x] Child rows use composite keys `(company_id, id)`, so the database
+      rejects cross-company references. Uniqueness is per company for
+      role and shop names; emails are global and stored lower case.
+- [x] Postgres: forced RLS on every tenant table. `users` and `sessions`
+      also accept a transaction-local `app.auth_lookup` flag, set only
+      around the login and session lookups.
+
+**Auth:**
+- [x] Opaque sessions: 32 random bytes, SHA-256 hash stored, 12 h idle /
+      30 days absolute, activity refreshed at most once a minute.
+- [x] `balce_session` cookie (HttpOnly, SameSite=Lax, Path=/, Secure in
+      cloud or over HTTPS). Desktop sends a Bearer token, which the login
+      body returns only when `X-Balce-Client: desktop` is sent.
+- [x] Unknown emails spend the same bcrypt time as wrong passwords and get
+      the same message; 5 failures per IP+email per minute, then 429.
+      Failed attempts are recorded even though the response is a 401.
+- [x] Sessions end on logout, expiry, deactivation, role change and
+      password change. The session that changed its own password stays.
+- [x] Origin allowlist on non-GET requests (same-origin allowed); helmet.
+- [x] Setup only when no company exists, and desktop only (cloud returns
+      404). `cmd/admin create-company` creates cloud companies with a
+      one-time owner password that must be changed at first sign-in.
+
+**Users and roles:**
+- [x] Only owners manage owners; the last active owner can't be demoted
+      or deactivated; nobody can deactivate themselves; a non-owner can't
+      grant permissions they don't hold; the owner role can't be edited
+      or deleted; roles in use can't be deleted; delete deactivates.
+- [x] Lists are paginated and run at most 3 queries.
+
+**Frontend:**
+- [x] API address resolved at runtime (Tauri / Vercel / LAN origin).
+- [x] Refresh flow removed; a 401 clears the session.
+- [x] **Route guards now actually run.** They were in `frontend/middleware/`,
+      which Nuxt 4 never loads, so neither guard had ever been active.
+- [x] Permissions come with the session; the eleven per-page refetches
+      are gone.
+- [x] Users and roles pages on the new API; deactivate wording; owner
+      badges; the header uses the shared user and `logout()`.
+- [x] Phone layout: sidebar hidden below 768 px, tables scroll in their
+      card.
+- [x] `app/utils/portedRoutes.ts` hides pages that aren't rebuilt yet.
+
+**Edge-case tests** (SQLite, and Postgres as a non-superuser so RLS applies):
+- [x] Setup twice → 409; cloud setup → 404; setup owner gets all 40
+      permissions and the Main Shop.
+- [x] Wrong password and unknown email: same message, and similar timing.
+- [x] 6th failed login in a minute → 429; failures survive the rollback.
+- [x] Cookie flags; the cookie works for `/me`; only the hash is stored.
+- [x] No token or a forged token → 401; logout, idle and absolute expiry
+      → 401 and the row is removed; a deactivated user's session → 401
+      and they can't sign in.
+- [x] A foreign `Origin` → 403; the allowed origin works.
+- [x] Switching into another company's shop or an unassigned shop → 403.
+- [x] Invalid body → 400 with field errors; an email used by another
+      company → 409; another company's role or shop → 404 with nothing
+      written.
+- [x] A manager can't create an owner, demote the owner, grant themselves
+      `settings:edit` or widen their own role; the last owner can't be
+      demoted; the owner can't deactivate themselves.
+- [x] A role change ends the user's sessions.
+- [x] A password change keeps its own session, ends the others, and the
+      old password stops working.
+- [x] 30 users: page of 25 in ≤ 3 queries, shop ids attached, offset past
+      the end is empty, search is case-insensitive.
+- [x] Two-company isolation: every list is free of the other company's
+      data; 12 cross-tenant reads and writes return 404 and change
+      nothing; with RLS, unfiltered queries see nothing without a tenant
+      and one company's rows with it, and a cross-company insert is
+      rejected.
+- [x] A foreign SQLite file (tables but no migration history) is refused
+      and left untouched.
+- [x] The pre-migration copy is made when migrations are pending.
+
+**Verification performed (2026-09-29):**
+- `go build ./... && go vet ./...` clean; `TEST_DATABASE_URL=… go test
+  -count=1 ./...` → every package passes, every subtest on both engines
+  (confirmed with `-v`).
+- Mutation check: removing the company filter from the user lookup made
+  the isolation test fail on SQLite (200 instead of 404). File restored.
+- `cmd/admin create-company` smoke-tested: creates the company and
+  one-time password; rejects empty or invalid input with field messages.
+- `pnpm build` and `pnpm generate` pass.
+- Browser pane against the new backend on a scratch SQLite file:
+  first-run setup → sign-in lands on Users → create role → assign a
+  permission (200) → create cashier → full reload keeps the session →
+  `/pos` redirects to `/users` → sign-out → `/users` redirects to sign-in.
+  Checked light, dark and 375 px.
+- Bugs found and fixed while checking: route guards never loaded; header
+  logout posted to the frontend's own origin; stale role counts after
+  saving; the layout overflowed on phones; the badge text wrapped.
+
+**Known gaps (expected until later phases):**
+- `/api/license/status`, `/api/license/hardware-id` (Phase 7) and
+  `/api/notifications/count` (Phase 4) return 404. The UI handles them
+  quietly.
+- There's no shop picker in the user form yet; new users get the
+  creator's current shop. Shops UI is Phase 4.
+- `app/components/AppSidebar.vue` is unused; it gets deleted in Phase 9.
+
+**Manual follow-up:**
+- On the owner's Mac, `~/Library/Application Support/com.balceinv.app/balce.db`
+  (the old desktop app's database) has an extra empty-looking
+  `schema_migrations` table, left by an early smoke run before the
+  legacy-database guard existed. The old app ignores it. If you want it
+  gone, back up that file and run `DROP TABLE schema_migrations;` on it.
+  The revamped app now uses `balce.sqlite`, so it never touches that file.
+
+---
+
+## Phase 2: company settings, branding, currency, storage
+
+Backend: balceinv-api PR #10. Frontend: balceinv PR #2.
+
+- [x] `settings` table per company (tax in basis points, receipt, alert,
+      EFD and desktop printer fields), created with every company; RLS on
+      Postgres.
+- [x] `internal/common/storage`: one `Store` interface; a local-folder
+      store for desktop (media beside the database) and an S3 store for
+      Garage, signed with SigV4 using only the standard library. Keys must
+      match `^[a-z0-9][a-z0-9/_.-]*$` with no `..` or empty segments.
+      Cloud config requires every `S3_*` value.
+- [x] `GET/PUT /api/settings` with partial updates; `#RRGGBB` colours,
+      tax 0–100, upper-case currency, 0 or 2 decimals, IANA timezone,
+      `https://` EFD endpoint, valid notification email, 58/80 mm paper.
+- [x] EFD API key is write-only (`efd_api_key_set`); an empty value
+      clears it.
+- [x] Logo: ≤ 1 MB, type detected from the bytes (PNG/JPEG/WebP), stored
+      under `logos/<company>/<random>.<ext>`, served publicly and immutably
+      at `/api/branding/logo/<company>/<file>`.
+- [x] `/me` and login return `branding` (logo, colour, currency, decimals,
+      timezone, locale), so cashiers without `settings:view` still get
+      the brand and currency.
+- [x] Frontend theme: `--brand` drives primary, ring, chart and sidebar
+      accents; dark mode lightens it until it reaches 3:1 on the dark
+      page; text on the brand is black or white by contrast; the last
+      brand is cached and applied before the first render.
+- [x] Branding tab: picker, hex field, 13 presets, live light and dark
+      previews, a warning below 3:1 against the page, logo upload.
+- [x] Header shows the company logo and name; lucide icons for the theme
+      toggle.
+- [x] `formatMoney` replaces nine local formatters (eight TZS, one USD on
+      the dashboard) and the "(TZS)" labels.
+- [x] Settings page on the new API. Removed because they saved or did
+      nothing: the fake "Test EFD connection" (it always said unreachable)
+      and the "Change Counter" switch. The serial printer card and Updates
+      tab show only in the desktop app. Backup tab returns in Phase 7.
+- [ ] Currency locked after the first sale: the check lands with sales in
+      Phase 5.
+
+**Edge-case tests** (SQLite and Postgres as a non-superuser):
+- [x] Defaults; a settings read runs at most 2 queries.
+- [x] A partial update changes only the fields sent.
+- [x] 12 rejected inputs: `#fff`, `1d4ed8`, `#12345G`, tax 101 and −1,
+      `kes`, 3 decimals, an unknown timezone, an `http://` EFD endpoint,
+      a bad email, 70 mm paper, an empty business name.
+- [x] `/me` branding follows the settings; another company's settings are
+      unchanged; `settings` is included in the RLS check.
+- [x] A cashier gets 403 on settings but still receives the brand in
+      `/me`.
+- [x] The EFD key never appears in any response; another update keeps it;
+      an empty value clears it.
+- [x] Logo: missing file 400; text named `.png` 400; 1 MB + 1 → 413;
+      cashier 403; a valid PNG is stored and served byte-for-byte with
+      `image/png` and an immutable cache header; traversal, a bad company
+      id, an unknown file and `.svg` → 404.
+- [x] Both stores round-trip on a real folder and a real Garage; unsafe
+      keys are rejected; a wrong S3 secret is refused.
+- [x] Config: cloud without `S3_ENDPOINT` fails; a partial S3 config lists
+      every missing value; desktop media defaults beside the database.
+
+**Verification performed (2026-09-29):**
+- `go build ./... && go vet ./...` clean; `TEST_DATABASE_URL=…
+  TEST_S3_ENDPOINT=… go test -count=1 ./...` → every package passes;
+  settings subtests confirmed on both engines.
+- `pnpm build` and `pnpm generate` pass.
+- Browser pane against the new backend (desktop mode, local media): the
+  blue preset applies live (`--primary #2563eb`, white text, dark
+  `#5182ef`) and survives a reload; the slate preset gets a visible dark
+  variant; pale yellow shows the 1.2:1 warning; an invalid hex disables
+  saving; a PNG logo uploads and loads in the header cross-origin; KES
+  with 2 decimals saves and `/me` follows; the EFD key shows as saved and
+  is absent from the response; the Hardware tab shows only receipt
+  options in a browser; light, dark and 375 px (the tab row now scrolls).
+- Found and fixed while checking: the first contrast warning could never
+  fire (auto-picked text is always ≥ 4.58:1), so it now compares the brand
+  against the page background; near-black brands were invisible in dark
+  mode; the settings tab row was clipped on phones; the slate swatch
+  vanished on the dark background.
+
+**For the deploy round:** `/opt/balce/.env.prod` needs `S3_ENDPOINT=http://garage:3900`
+and `S3_BUCKET=balce-media`; the access key and secret are already there.
+
+---
+
+## Phase 3: products and catalog
+
+**Tables:** `products` (parent/variant, price/cost/wholesale in minor
+units, `image_key`, `metadata`, `is_active`), `barcodes`, `price_history`,
+`product_addons`, `catalog_products` (platform-wide), `shop_stock` and
+`stock_movements` (the stock core Phase 4 builds on).
+
+**Merged:** balceinv-api #11 (schema), #12 (media + stock core), #13
+(products API), #14 (catalog + team tools), #15 (restore), #16 (error
+message case); balceinv #3 (products page).
+
+- [x] List: paginated (`limit`/`offset`, total); search by name, SKU or
+      exact barcode; category filter; `include_archived`. One count, one
+      page query with the active shop's stock joined in, one barcode
+      batch query.
+- [x] Delete archives the product and its variants (`is_active = false`);
+      `POST /api/products/:id/restore` brings both back. Nothing is ever
+      hard-deleted, so a product that has sold keeps its history.
+- [x] Excel/CSV import: every row checked first (header aliases, messy
+      money like `TSh 1,500` or `3000/=`, the company's currency
+      decimals); any problem → 422 `import_rejected` with
+      `{row, column, problem}` and nothing saved; a clean file imports in
+      the request transaction with opening stock movements.
+- [x] Template downloads in the browser and in Tauri; the success toast
+      fires only after the file is saved (`utils/download.ts`, shared
+      with the catalog template and JSON export).
+- [x] Price changes write `price_history` in the same transaction.
+- [x] Images: ≤ 2 MB, type sniffed from the bytes, stored under
+      `products/<company>/…`, served from `/api/media/products/…`.
+- [x] Add-ons per product (unique name per product, on/off, delete).
+- [x] Common products (`internal/catalog`): `GET /api/catalog` returns the
+      list for the company's business type; prices are whole currency
+      units. Team tools (`/api/catalog/team/{summary,items,template,
+      import}`, `DELETE /api/catalog/team`) need sign-in plus
+      `X-Support-Passcode` (SHA-256 in `BALCE_SUPPORT_PASSCODE_HASH` or
+      compiled in; 5 wrong tries lock for a minute; 503 when unset).
+      Merge or replace; bad rows are skipped and listed; 422 when no row
+      is usable. Saved in batched upserts of 500.
+- [x] Seed lists moved to `internal/catalog/seeds`; empty lists are
+      filled from them at startup (the shipped files are still empty).
+- [x] One spreadsheet reader (`internal/common/spreadsheet`) for both
+      imports: .xlsx, CSV with BOM, semicolon CSV.
+- [x] Error messages are capitalised once in `response.Error`, so every
+      toast reads as a sentence.
+- [x] Frontend: products page rebuilt (server paging and search, category
+      filter, show archived, create / edit / add variant / archive /
+      restore, photo upload, barcodes with pack size, extra details,
+      add-ons tab, details dialog showing every field, import dialog with
+      the problem table). Catalog picker and team tools on the new API;
+      `formatShillings` gone from them. `/products` is ported and is the
+      home page for anyone who can view products.
+- [ ] Phone photo upload by QR: the session routes were not carried over;
+      they return with LAN mode in Phase 7.
+- [ ] Stock value and low-stock cards: dropped from the products page
+      until Phase 4 adds server-side totals (a page-only sum would lie).
+
+**Edge-case tests** (SQLite and Postgres as a non-superuser):
+- [x] The same SKU in two companies is fine; within one company (any
+      case) → 409; a barcode taken in the company → 409 and no product is
+      left behind.
+- [x] A variant whose parent belongs to another company → 404; a variant
+      of a variant or without a label → 400.
+- [x] Negative price → 400; zero price is allowed; nested metadata and a
+      repeated barcode → 400.
+- [x] 1,000-row import completes with 3,000 units of opening stock; one
+      bad row → nothing imported and rows 3–7 reported by column; wrong
+      type, no price column, header only → 400.
+- [x] Listing 25 of 200 products runs ≤ 3 queries.
+- [x] Archive hides the product and its variants; restore brings both
+      back; every product route answers 404 to another company.
+- [x] Oversell: parallel sales of 1 unit against stock 5 → exactly 5
+      succeed on both engines.
+- [x] Catalog: messy sheet parsing (6 rows read, 2 kept, problems on rows
+      5, 6, 7, 9), price parsing (`99.5` → 100, `free`/`NaN`/`1e20`/`-5`
+      rejected), seeding only fills empty valid lists, merge vs replace
+      counts, template round trip, another business type never leaks into
+      a company's list, a rejected replace leaves the list untouched,
+      1,200 rows across batches, company list ≤ 6 queries, wrong passcode
+      403, signed out 401, sixth guess locked out even with the right
+      passcode.
+- [ ] Archiving a product that has sold: re-checked in Phase 5 once sales
+      exist (delete already never removes rows).
+
+**Verification performed (2026-09-29):**
+- `go build ./... && go vet ./internal/... ./cmd/...` clean;
+  `TEST_DATABASE_URL=… go test -count=1 ./internal/... ./cmd/...` → every
+  package passes, catalog subtests confirmed on sqlite and postgres.
+- `pnpm build` passes.
+- Browser pane against the new backend (desktop mode, fresh database,
+  catalog imported through the team API with a test passcode): picking
+  "Sugar 1kg" fills name, `GEN-` SKU, category, unit, price and the Brand
+  detail; the product saves with 20 kg opening stock; edit changes the
+  price and adds a barcode while metadata and stock stay; an add-on is
+  added and switched off (saved `is_active: false`); a 1-litre variant is
+  created and the parent shows the variant badge; archive hides it,
+  "Show archived" shows it dimmed, restore brings it and its variant
+  back; a broken CSV shows three problems by row and column and saves
+  nothing; the web template download saves a 6.3 KB xlsx; exact barcode
+  search finds one product; a photo uploaded through the form and one
+  through the API both load as thumbnails from `/api/media`; light,
+  dark and 375 px with no horizontal scroll (image and category columns
+  hide on phones). No console warnings from the new components.
+- Found and fixed while checking: restore through a full `PUT` would have
+  left variants archived, so restore became its own endpoint; lowercase
+  API messages in toasts; double page padding and wrapped stock badges
+  on phones.
+
+**Known limits:** `GET /api/catalog` returns the whole list for the
+business type (at most 20,000 rows per import) and the picker searches it
+in the browser; switch to server search if a list grows past that. Team
+tools are opened from the desktop-only Updates tab, so the cloud catalog
+has no web entry point yet; add one when the team first needs to manage
+cloud lists.
+
+---
+
+## Phase 4: shops, stock, transfers, notifications
+
+**Tables:** `shop_stock` (key `shop_id, product_id`), `stock_movements`
+(reason is one of `sale`, `purchase`, `adjustment`, `damage`,
+`transfer_in`, `transfer_out`, `opening`), `stock_transfers` +
+`stock_transfer_items`, `notifications`.
+
+- [ ] Every stock change is one conditional update that refuses to go
+      below zero, plus a movement row, in the same transaction.
+- [ ] A low or out-of-stock notification fires once when a threshold is
+      crossed, not on every sale.
+- [ ] Shops CRUD (cloud); shop switcher in the header (cloud only).
+- [ ] Stock and transfer pages.
+
+**Edge-case tests:**
+- [ ] An adjustment below zero → 409 and nothing written.
+- [ ] Transfer to the same shop → 400; from a shop the user isn't assigned
+      to → 403.
+- [ ] 10 parallel sales of 1 unit against stock 5 → exactly 5 succeed, on
+      both engines.
+- [ ] Invariant: the sum of movements equals `shop_stock.quantity` for
+      every product after a mixed scenario.
+- [ ] Crossing `min_stock` twice in a row creates one notification.
+
+**Verification performed:** _pending_
+
+---
+
+## Phase 5: discounts and sales (POS)
+
+**Tables:** `discounts` (percent in basis points or a fixed amount),
+`sales` (`client_ref` unique per company, subtotal, discount, tax, total,
+paid, change), `sale_items` (product name, unit price and **unit cost**
+snapshotted), `sale_item_addons`.
+
+- [ ] `POST /api/sales`: the server recomputes every price, discount and
+      tax from the database; ignores prices sent by the client; takes the
+      receipt number from the shop counter; updates stock, inserts the
+      sale, items and movements, and raises alerts, all in one
+      transaction.
+- [ ] Replaying the same `client_ref` returns the original sale with its
+      original status.
+- [ ] Tax-inclusive calculation in integers, with the rounding rule written
+      down here once it's decided and tested.
+- [ ] Browser receipt page (80 mm) for LAN tills and cloud; the desktop
+      serial print path stays the same.
+- [ ] POS generates `client_ref` per checkout with
+      `crypto.randomUUID()`.
+
+**Edge-case tests:**
+- [ ] Replay the same body → same sale, stock decremented once; same
+      `client_ref` with a different body → 409.
+- [ ] Insufficient stock on any line → 409 and nothing written.
+- [ ] A tampered client price is ignored.
+- [ ] Expired or inactive discounts are not applied.
+- [ ] Wholesale price applies at `wholesale_min` and not one below.
+- [ ] Rounding: 1-unit items and 18% tax on awkward totals match the
+      written rule.
+- [ ] Cash paid below the total → 400.
+- [ ] Receipt numbers stay unique and gap-free per shop under 20 concurrent
+      sales.
+- [ ] Another company's product in the cart → 404, nothing written.
+- [ ] Changing the currency after this first sale → 409.
+
+**Verification performed:** _pending_
+
+---
+
+## Phase 6: reports and dashboard
+
+- [ ] All six report routes plus `/api/dashboard` rewritten as SQL
+      aggregates (`SUM`/`COUNT`/`GROUP BY`), filtered by shop or all shops.
+- [ ] Days are grouped in the company's timezone
+      (`companies.timezone`, default `Africa/Dar_es_Salaam`) through the
+      dialect helper.
+- [ ] Profit uses the `unit_cost` snapshot, never the current product cost.
+- [ ] Exports: Excel built client-side with `xlsx` and saved via
+      Blob/Tauri; PDF through the print stylesheet. No backend export
+      routes.
+
+**Edge-case tests:**
+- [ ] A seeded dataset gives exact expected totals.
+- [ ] Changing a product's cost after a sale leaves past profit unchanged.
+- [ ] An empty range returns zeros, never nulls.
+- [ ] A sale at 23:30 UTC counts on the next local day in Dar es Salaam.
+- [ ] The query count stays the same with 10 or 10,000 sales.
+- [ ] Shop filter; cross-tenant isolation.
+
+**Verification performed:** _pending_
+
+---
+
+## Phase 7: desktop specifics and LAN
+
+- [ ] Backup/restore moves to `VACUUM INTO`, and the existing backup tests
+      are ported.
+- [ ] License (hardware ID) behaviour unchanged, desktop only.
+- [ ] Serial printing unchanged, desktop only.
+- [ ] LAN toggle: the sidecar restarts on `0.0.0.0:8080`; Go serves
+      `BALCE_STATIC_DIR` with an `index.html` fallback; `/api/platform`
+      reports `lan_urls`; Network screen with a QR code.
+- [ ] The phone image-upload QR works on the LAN.
+
+**Edge-case tests:**
+- [ ] Backup → restore round-trip keeps every row.
+- [ ] The static fallback serves `index.html` for deep links but never for
+      `/api/*`.
+- [ ] LAN off → the port isn't reachable from another machine.
+
+**Manual follow-up:** two real machines on one Wi-Fi. Turn on LAN → allow
+the Windows firewall prompt for **private networks** → open the shown URL
+on the second machine → log in as a cashier → sell → print from that
+browser to a thermal printer installed with its OS driver. Check that the
+80 mm layout fits and that two tills selling at the same moment both
+succeed.
+
+**Verification performed:** _pending_
+
+---
+
+## Phase 8: languages (en, sw)
+
+- [ ] `useI18n`: `t(key, params)`, JSON dictionaries, per-user locale with
+      a company default, `Intl` for numbers and dates.
+- [ ] API errors carry a stable `code`; the frontend translates by code.
+- [ ] Every page moved to `t()`; browser receipts translated; desktop
+      serial receipts use a label map chosen by `settings.receipt_language`.
+
+**Edge-case tests:**
+- [ ] A missing key falls back to English and is never shown blank.
+- [ ] Switching language updates the page without reload.
+- [ ] Swahili strings don't break the layout at 375 px.
+
+**Verification performed:** _pending_
+
+---
+
+## Phase 9: switch-over and cleanup
+
+- [ ] Tauri builds `cmd/server`; the old `main.go`, `handlers/`,
+      `services/`, `repository/`, `models/`, `utils/jwt.go`, GORM and
+      `golang-jwt` are deleted.
+- [ ] `release.yml` ldflags point at
+      `internal/config.CompiledSupportPasscodeHash` (the old
+      `config.CompiledSupportPasscodeHash` goes with the old code).
+- [ ] Unused frontend dependencies removed after a grep proves them unused
+      (`@libsql/client`, `drizzle-orm`, `drizzle.config.ts`, `pg`,
+      `puppeteer-core`, `@sparticuz/chromium`, `jsonwebtoken`, `bcryptjs`,
+      `@iconify/vue` once `ModeToggle.vue` is gone).
+- [ ] Dead components deleted: `AppSidebar.vue` and `ModeToggle.vue`
+      (neither is used).
+- [ ] The "hidden until ported" nav list is deleted.
+- [ ] `CLAUDE.md` stack section updated (database/sql + pgx/modernc, no
+      GORM, the new layout).
+- [ ] Full regression on both engines; `/security-review` on the branch; a
+      macOS Tauri build; a Windows build checked manually.
+
+**Verification performed:** _pending_
 
 ## Manual follow-up required
+_Collected from the phases above as they complete._
 
-1. Windows PC on v1.0.17 (installed with the `-setup.exe`). This PC still
-   runs v1.0.17's updater code, so in Settings → Updates click "Check for
-   Updates" first and then "Download Update". Expect: the installer
-   progress bar with no "Error opening file for writing" box, then the
-   app reopens on v1.0.18 with the same sales and products. Check in Task
-   Manager that exactly one `backend.exe` is running afterwards. From
-   v1.0.18 on, the toast → "Update and restart" path works in one click.
-2. Windows PC installed with the `.msi`: same test. The NSIS hook does
-   not apply to MSI. Updates from v1.0.17 may ask for a reboot to replace
-   `backend.exe`; from v1.0.18 on, `stop_backend` handles it.
-3. Apple Silicon Mac and Intel Mac: update from the toast and confirm the
-   app relaunches by itself on the new version. The Intel Mac needs the
-   v1.0.18 `x86_64` installer first, because no earlier Intel build
-   exists.
-4. Linux: AppImage and `.deb` install, then update. The `.deb` path asks
-   for the admin password (the updater runs `dpkg -i`).
-
-# Subscription payment audit and redesign (also in v1.0.18)
-
-## Findings fixed
-
-1. False "Payment received" during a trial or grace period: the old poll
-   read `/api/license/status`, which already said `licensed: true`, so it
-   passed within 4 s whether or not anything was paid, and nothing asked
-   the server for the new expiry until the next app start.
-2. Trial and grace banners were never visible: `fixed top-0 z-40` sat
-   under the header (`fixed top-0 z-50`).
-3. The grace banner showed days since expiry as "days left"
-   (`Math.abs(days_remaining)`). Expired 1 day ago displayed "1 day left",
-   when 4 remained.
-4. "Subscribe" during a trial opened an empty plan list, because plans
-   were only fetched when the app was locked.
-5. A PC with a wrong date got "subscription expired" instead of "fix the
-   date".
-6. Stuck states: no way out of the 90 s waiting screen, "Check again"
-   could start parallel polls, and no sign-out on the lock screen, so a
-   cashier could not switch to an admin.
-7. After an unlock, pages that failed with 402 stayed empty, and raw
-   "license expired on …" error toasts stacked above the lock screen.
-8. Friction: phone numbers with spaces or +255 were rejected, the network
-   was picked from a dropdown, and the prompt said "MNO PIN".
-
-## What changed
-
-- Backend `license.CurrentStatus()`: one calculation with rounded-up days,
-  real `grace_days_remaining`, and `lock_reason` (missing / expired /
-  clock). New `POST /api/license/refresh` asks the server for this
-  device's license (works while locked). Activation never replaces a
-  paid license with an older one, and "offline" is a typed error with a
-  plain message. The pay proxy validates phone, network and plan, and
-  server 5xx or HTML answers become one plain sentence.
-- Payment flow: Plan → Pay → Confirm. Plans get tiered icons (sprout /
-  trees / crown), price per month, "Current" and "Best value" tags. The
-  phone field is focused automatically, accepts any format, and formats
-  as you type. Network buttons in each network's colour are picked from
-  the prefix. The waiting screen has a timer, "Send again" after 30 s,
-  and Cancel. Success is declared only when the server reports a new or
-  longer license. "Not confirmed yet" warns not to pay twice.
-- Lock screen: a reason-specific message, a payment flow for admins,
-  "Sign in as admin" for cashiers, a copyable device ID, and sign-out.
-  After any unlock it shows "All set" and reloads.
-- Header: a card icon with a days-left badge (amber for trial or ending
-  within 7 days, red for grace), a popover with Subscribe / Renew now,
-  and one grace warning per session.
-- Any 402 from the API re-checks the license at once, and toasts are
-  hidden while the lock screen is up.
-- The brand name was replaced with "POS" in all user-facing text. The
-  installer product name and internal IDs were kept, because changing
-  them would move the install folder and orphan existing data.
-
-## Verification performed
-
-- `go test ./license ./backup`: all license states (missing, paid,
-  5 hours left, grace, expired, trial, clock set back), activation
-  (trial upgrade, renewal saved, older copy ignored, offline detected).
-- `node frontend/scripts/mobileMoney.check.ts`: phone normalizing for
-  `0712…`, `+255 712…`, `255…`, `712…`, and bad input; network
-  detection; duration and price formatting.
-- `pnpm build`: clean.
-- Live in the browser against the scratch backend and a fake licensing
-  server that confirms payments 12 s after the request:
-  - Trial: amber badge "10" → Subscribe → plans listed → `+255 754 123 456`
-    became `0754 123 456` with M-Pesa auto-picked → still waiting at 6 s
-    (no false success) → "Payment received, active until 26 October"
-    after confirmation. The badge disappeared.
-  - Grace: red badge "4" and a one-time warning with Renew. A declined
-    payment showed the server's reason ("Insufficient balance…"). Typing
-    and Enter worked with no clicks.
-  - Expired: lock screen with plans, no stray toasts. Paying Quarterly
-    with `688123456` (Airtel auto-picked) → "All set" → the app reloaded
-    unlocked with data.
-  - Wrong clock: the "computer's date is wrong" screen with Check again,
-    and no payment option.
-  - Licensing server down while locked: "No internet connection…" with
-    Try again.
-  - Cashier while locked: "Ask the owner or an admin", with a Sign in as
-    admin button.
-  - Plan tiles checked in light and dark mode.
-
-## Manual follow-up required
-
-- One real payment against production (`backend.wapangaji.com`) from a
-  trial PC and from an expired PC, to confirm that
-  `/balce/license/by-hardware/` returns the new expiry soon after the
-  mobile money callback. The flow waits up to 2 minutes, then offers
-  Check again.
-- Confirm the prefix → network map with the sales team (Vodacom
-  074/075/076, Tigo 065/067/071/077, Airtel 068/069/078, Halotel
-  061/062). The cashier can always change the network by hand.
-
-# Release v1.0.18
-
-- Pushed backend `6c10d72..9706426`, frontend `0cb1055..222f9ae`, parent
-  `7557908..450ffea`, then the annotated tag `v1.0.18`.
-- Release run: https://github.com/obmsuya/balceinv-desktop/actions/runs/36250028047
-  finished with all 4 jobs green: ubuntu-22.04, windows-latest,
-  macos-latest `aarch64-apple-darwin`, and the new macos-latest
-  `x86_64-apple-darwin`.
-- `gh release download v1.0.18 -p latest.json -O -` shows version
-  `1.0.18` with platforms `darwin-aarch64`, `darwin-x86_64`,
-  `linux-x86_64` (AppImage, deb, rpm) and `windows-x86_64` (msi, nsis).
-  Intel Macs now get updates through the updater from this version on.
-
-# Common products catalog with hidden team tools
-
-## Findings fixed
-
-- The catalog never reached clients. `backend/seeds/*.json` were empty,
-  and `services/setup.service.go` read them with a relative path that
-  does not exist next to the installed sidecar, so the "Pick from
-  Catalog" panel was always empty.
-- Seeding would have failed anyway. GORM's multi-row insert writes
-  `DEFAULT` for empty optional fields (`category`, `sub_category`),
-  which SQLite rejects (`near "DEFAULT": syntax error`). Found live and
-  covered by `repository/catalog_repository_test.go`.
-- The sales and support team had no way to load or refresh a list.
-- `handlers/catalog_handler.go` queried the database directly and
-  ignored errors.
-
-## Implementation status
-
-- [x] `backend/seeds/seeds.go` embeds `seeds/*.json` in the binary.
-- [x] `repository/catalog_repository.go`:
-  - find and count, per business type;
-  - replace, and merge by product name (ignoring case and spaces);
-  - clear;
-  - rows inserted one by one inside a transaction.
-- [x] `services/catalog_service.go`:
-  - Reads `.xlsx` and `.csv`, including semicolon CSVs and Excel's BOM.
-  - Header aliases: `product name` → name, `selling price` → price,
-    `sku` → sku prefix, `uom` → unit. Any other column becomes a detail
-    (metadata), such as strength or form.
-  - Prices like `TSh 1,500` or `500/=` are read correctly.
-  - Skips blank rows. Reports empty names, repeated names and bad
-    prices by row number.
-  - Limit of 20,000 rows. Template download.
-  - The bundled seed list is loaded at startup and at setup when the
-    shop's list is empty.
-- [x] `middleware/support.go`:
-  - The `X-Support-Passcode` header is checked against a SHA-256 hash
-    (`CompiledSupportPasscodeHash` via ldflags, or
-    `BALCE_SUPPORT_PASSCODE_HASH`).
-  - 5 wrong tries lock it for 1 minute.
-  - Returns 503 "Team tools are not set up in this build" when no hash
-    was built in.
-- [x] Routes under `/api/catalog/team` (sign-in plus passcode):
-  `GET summary`, `GET items`, `GET template`, `POST import`, `DELETE`.
-  The client-facing `GET /api/catalog` is unchanged. CORS allows the
-  new header.
-- [x] `.github/workflows/release.yml` passes
-  `secrets.SUPPORT_PASSCODE_HASH` to all four sidecar builds.
-- [x] Frontend `utils/businessTypes.ts`: one business-type list with
-  icons, now used by setup and team tools.
-- [x] Frontend `composables/useCatalog.ts`:
-  - client list cached with `useState`;
-  - team unlock, import, clear, template and "Export for bundling"
-    (JSON in the seed format);
-  - file checks before upload (type, empty, 4 MB).
-- [x] `components/catalog/TeamCatalogDialog.vue`:
-  - Passcode screen.
-  - Business-type tiles with counts and a "This shop" tag.
-  - Drop zone with inline file errors.
-  - "Add and update" or "Replace all" (red button).
-  - Result with added, updated and skipped counts, plus a skipped-rows
-    table.
-  - Searchable list preview, export, and clear with a confirm step.
-  - Closing the dialog always locks it again.
-- [x] Hidden entry: Settings → Updates → tap the version number 7 times
-  within 2.5 seconds between taps. Nothing on screen hints at it.
-- [x] `components/catalog/CatalogPicker.vue` in the add product dialog:
-  - "Pick from common products" with a count, search, and Enter picks
-    the top match.
-  - Retry on error. Hidden when the shop's list is empty.
-
-## Verification performed
-
-- `go build ./...`, `go vet` on the touched packages, and `go test ./...`:
-  - catalog parsing;
-  - seed reading;
-  - passcode lockout;
-  - SQLite replace, merge and clear.
-
-  With the insert fix reverted, the repository test fails with the same
-  `DEFAULT` error.
-- `pnpm generate` built cleanly. `nuxi typecheck` could not run here
-  because of a vue-tsc and TypeScript version mismatch in the npx cache.
-- Live API checks against a scratch backend (port 8099, scratch HOME,
-  test passcode hash):
-  - The bundled seed list loaded into an empty `retail` list at startup.
-  - No passcode gives 403. Not signed in gives 401. After 5 wrong
-    passcodes, even the right one gives 429.
-  - A messy semicolon CSV added 3 and skipped rows 4, 5 and 6 with
-    reasons. Importing it again gave 0 added and 3 updated.
-  - A file with no name column, a header-only file, an `.xls` file, a
-    business type of `../etc` and an unknown mode each gave a plain 400
-    message.
-  - The template `.xlsx` downloaded. Importing it into `retail` with
-    Replace put 3 products with strength and form details into the
-    client list.
-  - Clear removed 3. The CORS preflight allows `X-Support-Passcode`.
-  - 20,000 rows took 0.44 s to add and 0.25 s to update all of them.
-
-## Manual follow-up required
-
-1. **Set the passcode before the next release.**
-   - Pick a long passphrase for the team.
-   - Get its hash:
-     `printf %s 'the passphrase' | shasum -a 256`
-   - Add the hash as the repository secret `SUPPORT_PASSCODE_HASH`.
-   - Without it, the team dialog shows "Team tools are not set up in
-     this build".
-2. **Visual check.** The browser run was not possible in this session.
-   - In `pnpm dev`, go to Settings → Updates and tap the version 7
-     times.
-   - Check the passcode screen, tiles, drop zone, result and preview in
-     light and dark mode.
-   - Then open Products → Add Product → "Pick from common products".
-3. **Bundle curated lists.**
-   - Use "Export for bundling" to save `<type>.json`.
-   - Commit it as `backend/seeds/<type>.json`.
-   - Every new install and every existing shop with an empty list gets
-     it on the next start.
+- **Phase 3, desktop app (needs a Tauri build of `cmd/server` with
+  `BALCE_SUPPORT_PASSCODE_HASH` or the compiled hash set):** in Settings →
+  Updates, tap the version seven times, enter the team passcode, import a
+  common-products sheet, then open Products → Add product and check the
+  picker lists it. Also click Template on the products page and in team
+  tools: a native save dialog must open and the saved `.xlsx` must open
+  in Excel. The browser path is verified; the Tauri save dialog is not.
