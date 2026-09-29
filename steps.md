@@ -95,10 +95,16 @@ Cloudflare Origin Certificate) and **Woodpecker CI**. Hardware: Ubuntu
       tables; PUBLIC can't connect.
 - [x] Garage: single-node layout applied, bucket `balce-media`, key
       `balce-api` stored in `.env.prod`.
-- [ ] Proxy: `/opt/proxy` (Caddy on the host network, one site file per app)
-      is uploaded but **not started**. nginx still serves faltasi.
-      Waiting for the owner to choose between keeping nginx and moving
-      faltasi to Caddy (and whether faltasi stays on this server at all).
+- [x] Proxy: nginx replaced by Caddy (`/opt/proxy`, host network, one site
+      file per app in `/opt/proxy/sites/`). faltasi is kept, and its site
+      file `faltasi.caddy` lives only on the server, serving the same
+      Cloudflare Origin Certificate from `/etc/ssl`, the same two security
+      headers, and proxying to `127.0.0.1:8000`. Switch-over took 2 s,
+      with a script that would have restarted nginx if faltasi hadn't
+      answered 200 within 30 s. nginx packages removed (not purged; config
+      still in `/etc/nginx` and in the preflight copy). Caddy uses 10 MiB.
+      The Balce site file is added in the deploy round, once the domain
+      exists.
 
 ### S6: secrets in `.env.prod`
 - [x] `init-secrets.sh` created `/opt/balce/.env.prod` (`600`, root) with
@@ -143,6 +149,12 @@ through Cloudflare.
 - `ufw status`, `ss -tlnp`, and `nc -z` from the Mac on 10 ports (results
   above).
 - `curl` through Cloudflare: `https://faltasi.wapangaji.com/health` → 200.
+- Caddy switch-over: `/`, `/docs`, `/health` and `/openapi.json` return the
+  same status and byte size as under nginx; `X-Frame-Options` and
+  `X-Content-Type-Options` still present; `http://` → 308 to `https://`;
+  only Caddy listens on 80/443; `caddy validate` passed before the switch.
+- Reboot readiness: `docker` and `containerd` enabled; every container has
+  an `always` or `unless-stopped` restart policy.
 - `docker inspect` health: `balce-postgres` and `balce-garage` healthy.
 - `pg_roles` and `has_*_privilege` queries (results above).
 - `backup.sh` → 2 KB dump; `restore-drill.sh` → "row counts match (0
