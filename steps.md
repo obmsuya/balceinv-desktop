@@ -46,86 +46,107 @@ Two tracks run in parallel:
 
 ## Track S: cloud server (`140.99.254.193`, host `faltasi`)
 
-Files live in the backend repo under `deploy/` so the server is
-reproducible: `server-setup.sh`, `docker-compose.prod.yml`, `Caddyfile`,
-`garage.toml`, `postgres/init/`, `.env.prod.example`, `init-secrets.sh`,
-`backup.sh`, `restore-drill.sh`, `pull-backups.sh`, `deploy.sh`.
+Files live in the backend repo under `deploy/` (balceinv-api PR #6), so
+the server can be rebuilt from the repo.
 
-### S1: key-only SSH access (owner action, then verified)
-- [ ] Owner runs `ssh-copy-id -i ~/.ssh/id_ed25519.pub root@140.99.254.193`
-      once and types the password in their own terminal.
-- [ ] Verify with a key login: `ssh -o BatchMode=yes root@140.99.254.193 true`.
-- [ ] Record the OS, CPU architecture, RAM and disk, and size everything
-      below from those numbers.
+**The server is shared.** It also runs **faltasi-wealth** (FastAPI +
+Postgres 15 + Redis, served at `faltasi.wapangaji.com` through nginx with a
+Cloudflare Origin Certificate) and **Woodpecker CI**. Hardware: Ubuntu
+25.04, 1 vCPU, 2 GB RAM, 28 GB disk.
+
+### S1: key-only SSH access
+- [x] Owner ran `ssh-copy-id`; key login verified with `BatchMode=yes`.
+- [x] Inventory recorded (above). Everything below is sized for 2 GB RAM.
 
 ### S2: OS hardening
-- [ ] `apt update && apt full-upgrade`; `unattended-upgrades` for security
-      updates only.
-- [ ] Timezone UTC; a swap file if RAM ≤ 4 GB; journald capped at 200 MB.
-- [ ] sshd: `PasswordAuthentication no`, `KbdInteractiveAuthentication
-      no`, `PermitRootLogin prohibit-password`. Validate with `sshd -t`,
-      reload, then **confirm a new key session works before closing the old
-      one**.
-- [ ] Owner changes the root password afterwards; it's in the chat
-      transcript. With key-only SSH it only matters at the provider console.
+- [x] fwupd stopped and masked (it held about 600 MB of RAM).
+- [x] 1 GB swap file, `vm.swappiness=10`. Timezone was already UTC.
+- [x] **Password SSH stays enabled, by the owner's decision** (a
+      non-technical client needs it). ufw rate-limits port 22 instead.
+- [ ] Package updates and unattended security upgrades: waiting for the
+      owner's go-ahead in this session.
+- [ ] Ubuntu 25.04 has had no security updates since January 2026.
+      Upgrade to 26.04 LTS later, **after a provider snapshot**, in a
+      maintenance window (runbook to be written).
 
 ### S3: firewall
-- [ ] ufw: default deny incoming, allow outgoing, `limit 22/tcp`, allow
-      80/tcp and 443/tcp; enable.
-- [ ] Docker bypasses ufw for published ports, so **only Caddy publishes
-      ports**. Postgres and Garage sit on an internal compose network with
-      no `ports:`.
-- [ ] Check from the Mac: 22/80/443 open; 5432, 3900, 3901 and 3903 closed.
+- [x] ufw: default deny incoming, `limit 22/tcp`, allow 80/tcp and 443/tcp.
+- [x] Docker bypasses ufw, so the other apps' published ports were
+      rebound to `127.0.0.1`: faltasi Postgres 5432, Redis 6379 and API
+      8000, and Woodpecker 8001. The original compose files are saved in
+      `/root/balce-preflight-20260929/`. Woodpecker's UI is now reached
+      with `ssh -L 8001:127.0.0.1:8001 root@140.99.254.193`.
+- [x] External scan from the Mac: 22/80/443 open; 5432, 6379, 8000, 8001,
+      3900, 3901 and 3903 closed.
 
 ### S4: Docker
-- [ ] Docker Engine and the compose plugin from Docker's apt repo.
-- [ ] `/etc/docker/daemon.json`: `json-file` log driver with max-size 10 MB
-      and 3 files, and `live-restore`.
+- [x] Docker was already installed. Unused images and build cache pruned:
+      disk went from 8.3 GB to 18 GB free.
+- [x] Log rotation is set per service in the compose files (10 MB × 3).
+      `daemon.json` is left alone, because changing it means restarting
+      every container on the box.
 
-### S5: base stack in `/opt/balce`
-- [ ] `postgres:17-alpine`: memory limit, tuned `shared_buffers` and
-      `work_mem`, data volume, healthcheck.
-- [ ] Postgres roles from `postgres/init/`: `balce_owner` (owns the schema,
-      runs migrations) and `balce_app` (runtime; not an owner, no
-      `BYPASSRLS`).
-- [ ] Garage (S3-compatible, single node, replication 1): memory limit,
-      buckets `balce-media` and `balce-backups`, an access key for the API.
-- [ ] Caddy: answers on `:80` with a placeholder until the domain round.
-- [ ] `docker compose ps` all healthy; `docker stats` recorded (the
-      resource baseline).
+### S5: base stack
+- [x] `/opt/balce`: `postgres:17.11-alpine` (256 MB limit, tuned for small
+      RAM) and `dxflrs/garage:v2.4.1` (128 MB limit) on an `internal: true`
+      network; both healthy. Measured: Postgres 36 MiB, Garage 5 MiB.
+- [x] Roles checked: `balce_owner` owns database and schema; `balce_app`
+      can connect, isn't superuser, can't bypass RLS and can't create
+      tables; PUBLIC can't connect.
+- [x] Garage: single-node layout applied, bucket `balce-media`, key
+      `balce-api` stored in `.env.prod`.
+- [ ] Proxy: `/opt/proxy` (Caddy on the host network, one site file per app)
+      is uploaded but **not started**. nginx still serves faltasi.
+      Waiting for the owner to choose between keeping nginx and moving
+      faltasi to Caddy (and whether faltasi stays on this server at all).
 
 ### S6: secrets in `.env.prod`
-- [ ] `.env.prod.example` in the repo lists every key with no values.
-- [ ] `init-secrets.sh` on the server creates `/opt/balce/.env.prod`
-      (`root:root`, `0600`), filling any empty key with `openssl rand -hex
-      32` and **never printing values**.
-- [ ] Owner instructions (below) for reading or rotating a value.
+- [x] `init-secrets.sh` created `/opt/balce/.env.prod` (`600`, root) with
+      five generated values; the Garage key was added by
+      `garage-setup.sh`. No value was ever printed.
 
 ### S7: backups
-- [ ] `backup.sh`: `pg_dump -Fc` through `docker exec` into
-      `/opt/balce/backups/`, keeping 7 daily and 4 weekly, with a copy
-      uploaded to the Garage `balce-backups` bucket. Run nightly by cron.
-- [ ] `restore-drill.sh`: restores the newest dump into a scratch database
-      and prints row counts per table next to the live database.
-- [ ] `pull-backups.sh` (run on the owner's Mac): rsyncs `backups/` **off
-      the box**. A backup kept only on the same VPS doesn't survive losing
-      the VPS.
+- [x] `backup.sh` (7 daily, 4 weekly), with cron at 02:30 UTC.
+- [x] `restore-drill.sh` restores into `balce_restore_check`, compares row
+      counts, then drops it.
+- [x] `pull-backups.sh` tested from the Mac.
+- Dropped from the plan: a copy of the backups into Garage. It sits on the
+  same disk, so it adds nothing; the off-box pull is the real protection.
 
-### S8: deploy script (written now, used in the next round)
-- [ ] `deploy.sh`: cross-compile a static linux binary
-      (`CGO_ENABLED=0`), copy it over, build a minimal image on the server,
-      `docker compose up -d api`, wait for `/health`, and roll back to the
-      previous image tag if it doesn't turn healthy.
-- [ ] Dry-run mode prints every step without changing the server.
+### S8: deploy script
+- [x] `deploy.sh --dry-run` prints every step; the linux/amd64 static build
+      compiles. The first real deploy happens once Phase 1 adds the `api`
+      service.
+
+#### Incident during S3 (2026-09-29)
+Rebinding faltasi's ports recreated its containers. The backend refuses to
+start without Redis, and Redis had been crash-looping since July 20 on a
+6-byte corrupt `dump.rdb` (an internet-exposed Redis without a password; a
+truncated dump is a common sign of tampering). faltasi returned 502 for a
+few minutes. With the owner's approval the corrupt file was deleted and
+Redis restarted empty; `/`, `/docs` and `/health` returned 200 again, also
+through Cloudflare.
 
 #### Owner instructions: secrets
 - Read a value: `ssh root@140.99.254.193 "grep ^KEY= /opt/balce/.env.prod"`.
-- Rotate a value: edit it with `nano /opt/balce/.env.prod`, then
-  `docker compose --env-file .env.prod up -d` in `/opt/balce`.
+- Rotate a value: edit it with `nano /opt/balce/.env.prod`, then run
+  `docker compose --env-file .env.prod -f docker-compose.prod.yml up -d`
+  in `/opt/balce`. Database passwords must also be changed inside
+  Postgres with `ALTER ROLE … PASSWORD`.
 - Never commit `.env.prod`, never paste it into chat, and keep a copy in a
   password manager.
 
-**Verification performed (Track S):** _pending_
+**Verification performed (Track S, 2026-09-29):**
+- `free -m`: available 447 MB → 974 MB after fwupd and swap (1,072 MB after
+  the Balce stack started).
+- `df -h /`: 8.3 GB → 18 GB free after the prune.
+- `ufw status`, `ss -tlnp`, and `nc -z` from the Mac on 10 ports (results
+  above).
+- `curl` through Cloudflare: `https://faltasi.wapangaji.com/health` → 200.
+- `docker inspect` health: `balce-postgres` and `balce-garage` healthy.
+- `pg_roles` and `has_*_privilege` queries (results above).
+- `backup.sh` → 2 KB dump; `restore-drill.sh` → "row counts match (0
+  tables)"; `pull-backups.sh` → the dump landed on the Mac.
 
 ---
 
