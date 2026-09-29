@@ -571,28 +571,102 @@ cloud lists.
 ## Phase 4: shops, stock, transfers, notifications
 
 **Tables:** `shop_stock` (key `shop_id, product_id`), `stock_movements`
-(reason is one of `sale`, `purchase`, `adjustment`, `damage`,
-`transfer_in`, `transfer_out`, `opening`), `stock_transfers` +
-`stock_transfer_items`, `notifications`.
+(reason is one of `opening`, `sale`, `return`, `purchase`, `adjustment`,
+`damage`, `transfer_in`, `transfer_out`), `stock_transfers` +
+`stock_transfer_items`, `notifications` (`low_stock` / `out_of_stock` per
+shop and product). Forced RLS on all of them in Postgres.
 
-- [ ] Every stock change is one conditional update that refuses to go
-      below zero, plus a movement row, in the same transaction.
-- [ ] A low or out-of-stock notification fires once when a threshold is
-      crossed, not on every sale.
-- [ ] Shops CRUD (cloud); shop switcher in the header (cloud only).
-- [ ] Stock and transfer pages.
+**Merged:** balceinv-api #17 (schema), #18 (shops), #19 (stock levels,
+adjustments, notifications), #20 (transfers); balceinv #4 (shops page,
+switcher, shop assignment), #5 (stock page), #6 (notifications).
 
-**Edge-case tests:**
-- [ ] An adjustment below zero → 409 and nothing written.
-- [ ] Transfer to the same shop → 400; from a shop the user isn't assigned
-      to → 403.
-- [ ] 10 parallel sales of 1 unit against stock 5 → exactly 5 succeed, on
-      both engines.
-- [ ] Invariant: the sum of movements equals `shop_stock.quantity` for
-      every product after a mixed scenario.
-- [ ] Crossing `min_stock` twice in a row creates one notification.
+- [x] Every stock change is one conditional update that refuses to go
+      below zero (`quantity + change >= 0 … RETURNING quantity, min_stock`)
+      plus a movement row, in the request transaction.
+- [x] A notification fires once when the quantity crosses its minimum or
+      reaches zero on the way down; sitting below the line or going back
+      up never repeats it.
+- [x] Shops CRUD (`/api/shops`): unique names per company, upper-cased
+      alphanumeric receipt prefix (default SALE), soft close, the last
+      open shop can't be closed. Nav entry in cloud mode only.
+- [x] Header shop switcher when a user works in more than one shop; it
+      reloads so every page shows the new shop. User forms get a Works in
+      checklist once there are two shops.
+- [x] `GET /api/stock` (levels, search, `status=low|out`),
+      `GET /api/stock/summary` (value at cost and at selling price, low
+      and out counts), `GET /api/stock-movements` (product, reason, date
+      filters), `POST /api/stock-movements` (received/returned must go up,
+      damaged must go down, correction either way).
+- [x] `POST /api/stock-transfers`: all items leave one shop and arrive in
+      the other in one transaction (a `transfer_out`/`transfer_in` pair per
+      item, reference = transfer id); list and detail endpoints.
+- [x] `/api/notifications`: list (unread or all), unread count, mark one
+      or all read, clear read; scoped to the active shop.
+- [x] Stock page replaces the old Stock Movements page: value cards,
+      levels, history, Change stock (received / returned / damaged /
+      counted with a stock-after preview), Send stock, transfer list and
+      details. The products page's stock value and low-stock cards from
+      Phase 3 live here now.
+- [x] Header bell polls only for users with `notifications:view` and
+      chimes only when the count grows after the first load; the
+      notifications page has Unread / All, mark read, mark all read and
+      clear read.
 
-**Verification performed:** _pending_
+**Edge-case tests** (SQLite and Postgres as a non-superuser):
+- [x] An adjustment below zero → 409 and nothing written (no movement, no
+      notification); wrong direction, zero, over a million, the `sale`
+      reason, unknown and foreign products are refused.
+- [x] Transfer to the same shop → 400; from a shop the user isn't
+      assigned to → 403 `shop_not_assigned`; closed, foreign or unknown
+      shops and products → 404; duplicates, empty lists and zero
+      quantities → 400; one short item refuses the whole transfer and
+      writes nothing.
+- [x] 10 parallel sales of 1 unit against stock 5 → exactly 5 succeed, on
+      both engines (from Phase 3's stock core).
+- [x] Invariant: the sum of movements equals `shop_stock.quantity` for
+      every product after a mixed run of openings, purchases, damage and
+      transfers across two shops.
+- [x] A 10→7→5→4→14→0 run creates exactly one low and one out
+      notification; the unit test covers every crossing case.
+- [x] Levels and history pages run ≤ 2 queries; the summary agrees with
+      the filters; a new branch starts empty; cashiers get 403 on every
+      stock and notification route; another company gets 404.
+- [x] Shops: validation, rename, close/reopen, last open shop → 409,
+      cross-company 404, cashier 403, the owner sees every open shop.
+- [x] Schema: same-shop and cross-company transfers, cross-company items
+      and unknown notification kinds are refused by the database; the
+      three new tables join the no-tenant RLS check.
+
+**Verification performed (2026-09-29):**
+- `go vet ./internal/... ./cmd/...` clean; `TEST_DATABASE_URL=… go test
+  -count=1 ./internal/... ./cmd/...` → every package passes, the new
+  shops, stock and transfer subtests confirmed on sqlite and postgres.
+- `pnpm build` passes on each frontend branch.
+- The Phase 3 preview database upgraded from v13 to v16 on start, with its
+  pre-migration copy written beside it.
+- Browser against the new backend (desktop mode): the value cards match
+  the data (112,500 at cost, 166,200 at selling price); damaging the last
+  3 Fanta wrote the movement with its note and one out-of-stock notice; a
+  branch was added through the Shops page (prefix `kko` saved as `KKO`);
+  the switcher appeared; sending 10 Coca Cola and 5 Sugar worked while 25
+  Sugar was caught before sending; the transfer list and details were
+  right; after switching, the branch showed 10 + 5 units (22,000 at
+  cost) and an empty notification list; Main showed the Fanta notice
+  with a badge of 1, mark read cleared it and clear read emptied the
+  list; the user form's Works in checklist toggles. No console errors;
+  no horizontal scroll at 375 px on /stock, /shops and /notifications.
+- The browser pane was hidden during this run, so it was driven through
+  the DOM and no screenshots were taken; dialogs stayed in the DOM as
+  `data-state=closed` because exit animations don't run without frames.
+- Found and fixed while building: Postgres can't infer the type of an
+  unused `$n IS NULL` parameter, so optional movement filters are added
+  to the SQL only when set, and mark-read is two plain queries.
+
+**Known limits:** the Send stock destinations come from the user's own
+shops (an owner sees every open shop; a keeper only the shops they work
+in). Closing a shop checks the open count without a lock, so two owners
+closing the last two shops at the same moment could leave none open;
+reopening either fixes it. Revisit if that ever happens.
 
 ---
 
@@ -729,6 +803,11 @@ succeed.
 
 ## Manual follow-up required
 _Collected from the phases above as they complete._
+
+- **Phase 4, look and feel:** the pane was hidden during verification, so
+  open /stock, /shops and /notifications in light and dark at phone and
+  desktop width and check spacing, badges and the Change stock / Send
+  stock dialogs by eye.
 
 - **Phase 3, desktop app (needs a Tauri build of `cmd/server` with
   `BALCE_SUPPORT_PASSCODE_HASH` or the compiled hash set):** in Settings →
