@@ -976,29 +976,102 @@ not all tabs.
 
 ## Phase 7: desktop specifics and LAN
 
-- [ ] Backup/restore moves to `VACUUM INTO`, and the existing backup tests
-      are ported.
-- [ ] License (hardware ID) behaviour unchanged, desktop only.
-- [ ] Serial printing unchanged, desktop only.
-- [ ] LAN toggle: the sidecar restarts on `0.0.0.0:8080`; Go serves
-      `BALCE_STATIC_DIR` with an `index.html` fallback; `/api/platform`
-      reports `lan_urls`; Network screen with a QR code.
-- [ ] The phone image-upload QR works on the LAN.
+The new server now runs the desktop features. The release workflow still
+builds the old `main.go` sidecar until the Phase 9 switch-over.
 
-**Edge-case tests:**
-- [ ] Backup → restore round-trip keeps every row.
-- [ ] The static fallback serves `index.html` for deep links but never for
-      `/api/*`.
-- [ ] LAN off → the port isn't reachable from another machine.
+- [x] **Backups** (`internal/backup`):
+  - `VACUUM INTO` → gzip, 7 dailies in `<data dir>/backups`, and an
+    automatic run every 6 h. Cloud backups via the licensing server are
+    unchanged.
+  - Restores are staged to `<db>.restore` only after a check: SQLite
+    header, `quick_check`, new format (`schema_migrations` + `companies`),
+    not dirty, not newer than the app. They are applied at the next start
+    before migrations.
+  - The old database is kept as `.before-restore` and a `before-restore`
+    backup is written first; a failed swap puts the files back.
+  - These routes run outside the request transaction (the SQLite writer
+    has one connection). Restore and file export/import are owner-only.
+  - The existing backup panel is back under Settings → Backups.
+- [x] **License**, unchanged, desktop only (`internal/licensing` over the
+      root `license` package): the same routes and response shapes; a 402
+      lock on `/api/*` except sign-in/out, setup, platform and license
+      routes; the trial starts on first setup; the tamper-check timestamp
+      and licensing sync timers run. `BALCE_LICENSE_CHECK=off` exists for
+      developers only.
+- [x] **Serial printing**, desktop only (`internal/printing`):
+  - The ESC/POS receipt is built from the same receipt data as the browser
+    receipt: en/sw labels, company timezone, currency decimals, the logo
+    from storage, the EFD code, 32/48 columns.
+  - Routes: `status`, `devices` (the port self-check), `test` (prints the
+    width and column count), `receipt` (with drawer kick).
+  - At the till, the desktop app prints to the receipt printer and falls
+    back to the browser if the printer fails.
+- [x] **LAN:**
+  - Settings → Network switch, saved in `network.json`; the listener
+    restarts in-process between `127.0.0.1:8080` and `0.0.0.0:8080`. If
+    listening on the network fails, the switch turns itself off.
+  - `/api/platform` reports `lan_available`, `lan_enabled`,
+    `listen_address` and `lan_urls` (the routed address first; virtual and
+    bridge adapters are left out). The screen shows QR codes and setup
+    steps.
+  - Go serves `BALCE_STATIC_DIR` with an `index.html` fallback, never for
+    `/api/*`.
+  - Tauri now bundles `frontend/.output/public` as a resource and passes
+    its path to the sidecar as `BALCE_STATIC_DIR`.
+- [x] **Phone photos:** `POST /api/phone-uploads` makes a 5-minute,
+      single-use link; `/upload/:token` is a bilingual camera page; the
+      photo must be a real JPEG, PNG or WebP of at most 2 MB. "Use phone" in
+      the product form shows the QR code and uses the photo once it arrives.
 
-**Manual follow-up:** two real machines on one Wi-Fi. Turn on LAN → allow
-the Windows firewall prompt for **private networks** → open the shown URL
-on the second machine → log in as a cashier → sell → print from that
-browser to a thermal printer installed with its OS driver. Check that the
-80 mm layout fits and that two tills selling at the same moment both
-succeed.
+**Edge-case tests** (SQLite; Postgres checks that the desktop routes are
+absent in cloud):
+- [x] Backup → second sale → staged restore → restart simulation: every
+      table's row count matches the backup; the replaced database is kept;
+      the restore isn't applied twice.
+- [x] Refused restores: non-owner, bad names, not gzip, old-format
+      database, newer version, relative/missing/`.txt` paths. Cloud listing
+      without a paid license → 402.
+- [x] The static fallback serves `index.html` for deep links, never for
+      `/api/*`; missing assets get 404; `../` can't escape the folder.
+- [x] LAN off → a listener answers on `127.0.0.1` but not on this machine's
+      network address; LAN on → it answers there. An explicit `LISTEN_ADDR`
+      wins.
+- [x] License: missing → locked with 402 while status, hardware ID,
+      platform and health stay open; setup starts a trial; expired → 402
+      but sign-out works; the lock is on by default and off with the flag.
+- [x] Printing to a file standing in for the port: off/no port → 409,
+      unplugged → 502, the receipt bytes land, test slip 58 mm/32 columns,
+      a cashier can't run a test print.
+- [x] Phone photos: sign-in and permission to create links; unreachable
+      when LAN is off; non-images, disguised files and 3 MB refused; a
+      second photo refused; another company can't collect; collected once;
+      expired after 5 minutes.
 
-**Verification performed:** _pending_
+**Verification performed (2026-09-29):**
+- **Automated:** `go vet` clean; `TEST_DATABASE_URL=… go test -count=1
+  ./internal/...` → every package passes. `pnpm build` and `pnpm generate`
+  pass. `cargo check` in `src-tauri` passes with the resource and env
+  change.
+- **Browser, against the new server serving the generated app:** the
+  preview ran with an isolated `HOME`, so the real app data and license on
+  this Mac were never touched.
+  - Switching LAN on moved the listener to `0.0.0.0:8080` in about 0.4 s
+    and listed `http://192.168.1.3:8080`. The OrbStack bridges were listed
+    too, which led to the virtual-adapter filter.
+  - Opened at `http://192.168.1.3:8080` as another device: sign-in and a
+    sale worked (`KKO-20260929-0003`); the receipt opened in the browser;
+    `/receipts/<id>` deep links loaded the app.
+  - The phone page loaded at the LAN link; a photo posted to it became the
+    new product's preview through "Use phone".
+  - Switching LAN off: `curl` to `192.168.1.3:8080` failed, while
+    `127.0.0.1` answered.
+
+**Known limits:**
+- Phone photo sessions live in memory and are lost if the network switch
+  restarts the listener mid-upload.
+- The Network and Backups tabs only show in the desktop app, so they were
+  checked through the API here, not on screen.
+- The release still ships the old sidecar until Phase 9.
 
 ---
 
@@ -1043,6 +1116,24 @@ succeed.
 
 ## Manual follow-up required
 _Collected from the phases above as they complete._
+
+- **Phase 7, desktop app and LAN (needs a build of the new sidecar,
+  Phase 9, or `tauri dev` with `cmd/server` as the sidecar):**
+  - **Network screen:** Settings → Network shows the switch, the
+    addresses and QR codes. Switching it on triggers the Windows firewall
+    prompt: allow **private networks** only.
+  - **Second machine on the same Wi-Fi:** scan the QR code or type the
+    address, sign in as a cashier, sell, and print from that browser on
+    an 80 mm printer installed with its OS driver (check the layout fits).
+    Two tills selling at the same moment must both succeed.
+  - **Receipt printer on the server PC:** Settings → Hardware → Refresh
+    lists the printer port; Test print shows the paper width; a real sale
+    prints through it and the drawer opens on cash sales.
+  - **Backups:** Settings → Backups → Back up now, then restore that
+    backup. The app restarts with the data from that moment, and
+    "before-restore" undoes it.
+  - **Phone photo:** a real phone on the Wi-Fi scans the product form's
+    code, takes a photo, and it appears on the computer.
 
 - **Phase 6, reports on real devices:**
   - **Printing:** print a report to PDF from Chrome and from the desktop
