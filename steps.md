@@ -875,25 +875,92 @@ not a separate tablet.
 
 ## Phase 6: reports and dashboard
 
-- [ ] All six report routes plus `/api/dashboard` rewritten as SQL
-      aggregates (`SUM`/`COUNT`/`GROUP BY`), filtered by shop or all shops.
-- [ ] Days are grouped in the company's timezone
-      (`companies.timezone`, default `Africa/Dar_es_Salaam`) through the
-      dialect helper.
-- [ ] Profit uses the `unit_cost` snapshot, never the current product cost.
-- [ ] Exports: Excel built client-side with `xlsx` and saved via
-      Blob/Tauri; PDF through the print stylesheet. No backend export
-      routes.
+- [x] Six report routes plus `/api/dashboard` as SQL aggregates
+      (`internal/reports`): `summary`, `daily`, `products`
+      (`sort=revenue|quantity|profit`), `cashiers`, `shops`, `inventory`.
+      All need `reports:view`. `shop` is empty (active shop), `all`, or an
+      id; non-owners only reach their assigned shops (`all` = theirs,
+      another shop → 403).
+- [x] Days are company-local (`companies.timezone`): Go cuts each local day
+      into UTC bounds and the query joins them as a `VALUES` list. The
+      dialect helper is a `CAST(... AS TIMESTAMPTZ)` for Postgres only, so
+      one SQL text runs on both engines, DST included. Ranges default to the
+      last 30 days, at most 366.
+- [x] Profit = total − tax − Σ `unit_cost` × quantity from the snapshots;
+      cash takings are net of change. Per-product profit removes tax line by
+      line, so it can differ from the overview by a few units (said on the
+      page).
+- [x] Stock totals match the Stock page: every active product in each open
+      shop in scope, a missing stock row counting as out. "Not selling" lists
+      stock unsold for `dead_stock_days`, most money tied up first.
+- [x] Exports: Excel built client-side with `xlsx` (Summary, Days,
+      Products, Staff, Shops) and saved through `saveFile` (Tauri dialog on
+      desktop); PDF through the print dialog, with the header, sidebar and
+      footer hidden when printing. No backend export routes.
+- [x] Dashboard page: today against yesterday, profit, month to date,
+      stock alerts, 14-day chart, best sellers, latest sales, This shop / All
+      shops, and a refresh every minute while the tab is visible.
+- [x] Exchange rates (asked for with Phase 6): `GET /api/exchange-rates`
+      (any signed-in user) returns the company currency against USD, EUR,
+      GBP, KES, UGX, RWF, CNY, AED, INR and ZAR.
+      - **Source:** ExchangeRate-API's free endpoint, no key, credited on
+        the card. One USD-based fetch serves every company through cross
+        rates.
+      - **Storage:** kept in `exchange_rate_snapshots` (migration 000024)
+        so an offline desktop keeps its last rates.
+      - **Refresh:** after 6 hours, the old rates are served at once
+        (`is_stale`) while one background refresh runs, with a 5 s timeout
+        and a 5-minute pause after a failure.
+      - **Failures** answer `available: false` with a readable reason and
+        never error: no first fetch, a captive portal or garbage answer, a
+        provider error, or a currency with no rates.
 
-**Edge-case tests:**
-- [ ] A seeded dataset gives exact expected totals.
-- [ ] Changing a product's cost after a sale leaves past profit unchanged.
-- [ ] An empty range returns zeros, never nulls.
-- [ ] A sale at 23:30 UTC counts on the next local day in Dar es Salaam.
-- [ ] The query count stays the same with 10 or 10,000 sales.
-- [ ] Shop filter; cross-tenant isolation.
+**Edge-case tests** (SQLite and Postgres as a non-superuser):
+- [x] A seeded dataset gives exact totals, tax, cost, profit, margin,
+      average and payments.
+- [x] Changing a product's cost after a sale leaves past profit unchanged.
+- [x] An empty range returns zeros and empty lists, never nulls, with one
+      row per day.
+- [x] A sale at 23:30 UTC and one at exactly 21:00 UTC count on the next
+      local day in Dar es Salaam; bad and over-long ranges → 400.
+- [x] The query count for all seven endpoints is the same with 10 and 150
+      sales. 150 rather than 10,000, to keep the suite fast; the count does
+      not depend on rows.
+- [x] Shop filter, manager scope (403 for another shop, `all` = their
+      shops), a cashier without `reports:view` → 403; another company's shop
+      → 404 and their "all" totals 0; stock over all shops and one shop.
+- [x] Exchange rates: provider down, garbage or error → unavailable; a fresh
+      fetch is cached (one provider call for two reads); stale plus offline
+      still serves the old rates; recovery once the provider is back; a KES
+      company; an unlisted currency; sign-in required.
 
-**Verification performed:** _pending_
+**Verification performed (2026-09-29):**
+- `go vet ./...` clean; `TEST_DATABASE_URL=… go test -count=1 ./...` →
+  every package passes; the rates test also passes under `-race`.
+- `pnpm build` passes.
+- The live provider was checked with `curl` (TZS and an unsupported code)
+  before choosing it.
+- Browser against the local backend (upgraded to v24 on start):
+  - **Dashboard:** live rates (1 USD = 2,646.72 TZS, updated
+    29 Sep 03:02). Today 12,720 in 2 sales, month to date, stock alerts,
+    the 14-day chart, best sellers and latest sales matched the data.
+  - **Reports:** Products ranked by sales, then by quantity. Per-product
+    profit −764 + 442 against −320 overall, which is the rounding
+    explained on the page. Staff 2 sales / 6,360 average. Stock showed
+    3 out, counting products never stocked in this shop. All shops showed
+    Kariakoo 12,720 and Main Shop 11,520.
+  - **Excel:** saved a 22 KB workbook.
+  - **Phone width (375 px):** no sideways scroll on the dashboard or
+    reports.
+- Found and fixed while verifying: stock totals ignored products with no
+  stock row (now counted as out, like the Stock page); the test harness's
+  `Items()` only reads paged lists, which made two assertions pass
+  vacuously until the tests read the array directly.
+
+**Known limits:** reports use the snapshots on each sale line, so returns and
+refunds (not built yet) will need their own lines before profit accounts for
+them. The rate list is fixed in code. Printing covers the tab being viewed,
+not all tabs.
 
 ---
 
@@ -966,6 +1033,16 @@ succeed.
 
 ## Manual follow-up required
 _Collected from the phases above as they complete._
+
+- **Phase 6, reports on real devices:**
+  - **Printing:** print a report to PDF from Chrome and from the desktop
+    app. Check that only the report prints (no menu) and the tables fit
+    the page width.
+  - **Excel:** open the exported workbook in Excel and LibreOffice.
+    Amounts must be plain numbers in major units.
+  - **Offline rates:** on the desktop app, open the dashboard once
+    online, then unplug the network and restart. The rates card must show
+    the saved rates with the offline notice rather than an empty card.
 
 - **Phase 5b, till extras on real hardware:**
   - **Touch till:** use the number pad with fingers and check the keys
