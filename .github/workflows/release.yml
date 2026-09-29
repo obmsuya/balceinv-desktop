@@ -48,7 +48,7 @@ jobs:
         if: matrix.platform == 'windows-latest'
         shell: bash
         env:
-          SIDECAR_LDFLAGS: "-s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/internal/config.CompiledSupportPasscodeHash=${{ secrets.SUPPORT_PASSCODE_HASH }}'"
+          SIDECAR_LDFLAGS: "-s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/internal/config.CompiledSupportPasscodeHash=${{ secrets.SUPPORT_PASSCODE_HASH }}' -X 'github.com/chrisostomemataba/balceinv-api/internal/config.CompiledSupportSmtpPassword=${{ secrets.SUPPORT_SMTP_PASSWORD }}'"
         run: |
           cd backend
           go build -trimpath -ldflags="-H=windowsgui $SIDECAR_LDFLAGS" -o ../src-tauri/bin/backend-x86_64-pc-windows-msvc.exe ./cmd/server
@@ -56,7 +56,7 @@ jobs:
       - name: Build Go Sidecar (Ubuntu)
         if: matrix.platform == 'ubuntu-22.04'
         env:
-          SIDECAR_LDFLAGS: "-s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/internal/config.CompiledSupportPasscodeHash=${{ secrets.SUPPORT_PASSCODE_HASH }}'"
+          SIDECAR_LDFLAGS: "-s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/internal/config.CompiledSupportPasscodeHash=${{ secrets.SUPPORT_PASSCODE_HASH }}' -X 'github.com/chrisostomemataba/balceinv-api/internal/config.CompiledSupportSmtpPassword=${{ secrets.SUPPORT_SMTP_PASSWORD }}'"
         run: |
           cd backend
           go build -trimpath -ldflags="$SIDECAR_LDFLAGS" -o ../src-tauri/bin/backend-x86_64-unknown-linux-gnu ./cmd/server
@@ -64,7 +64,7 @@ jobs:
       - name: Build Go Sidecar (macOS)
         if: matrix.platform == 'macos-latest'
         env:
-          SIDECAR_LDFLAGS: "-s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/internal/config.CompiledSupportPasscodeHash=${{ secrets.SUPPORT_PASSCODE_HASH }}'"
+          SIDECAR_LDFLAGS: "-s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/internal/config.CompiledSupportPasscodeHash=${{ secrets.SUPPORT_PASSCODE_HASH }}' -X 'github.com/chrisostomemataba/balceinv-api/internal/config.CompiledSupportSmtpPassword=${{ secrets.SUPPORT_SMTP_PASSWORD }}'"
         run: |
           cd backend
           CGO_ENABLED=1 GOARCH=amd64 go build -trimpath -ldflags="$SIDECAR_LDFLAGS" -o ../src-tauri/bin/backend-x86_64-apple-darwin ./cmd/server
