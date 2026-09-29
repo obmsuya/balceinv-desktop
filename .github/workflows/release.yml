@@ -37,7 +37,8 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22' # Adjust to match your local go version if necessary
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
 
       - name: Create bin directory
         run: mkdir -p src-tauri/bin
@@ -45,24 +46,29 @@ jobs:
       # 2. Compile Go Sidecars from within the backend directory
       - name: Build Go Sidecar (Windows)
         if: matrix.platform == 'windows-latest'
+        shell: bash
+        env:
+          SIDECAR_LDFLAGS: "-s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/internal/config.CompiledSupportPasscodeHash=${{ secrets.SUPPORT_PASSCODE_HASH }}'"
         run: |
           cd backend
-          go build -ldflags="-H=windowsgui -s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledAccessTokenSecret=${{ secrets.ACCESS_TOKEN_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledRefreshTokenSecret=${{ secrets.REFRESH_TOKEN_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledSupportPasscodeHash=${{ secrets.SUPPORT_PASSCODE_HASH }}'" -o ../src-tauri/bin/backend-x86_64-pc-windows-msvc.exe .
-        # Note: 'cd backend' moves into your Go project folder. 
-        # '../src-tauri/bin/...' saves the output back up into the Tauri directory.
+          go build -trimpath -ldflags="-H=windowsgui $SIDECAR_LDFLAGS" -o ../src-tauri/bin/backend-x86_64-pc-windows-msvc.exe ./cmd/server
 
       - name: Build Go Sidecar (Ubuntu)
         if: matrix.platform == 'ubuntu-22.04'
+        env:
+          SIDECAR_LDFLAGS: "-s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/internal/config.CompiledSupportPasscodeHash=${{ secrets.SUPPORT_PASSCODE_HASH }}'"
         run: |
           cd backend
-          go build -ldflags="-s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledAccessTokenSecret=${{ secrets.ACCESS_TOKEN_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledRefreshTokenSecret=${{ secrets.REFRESH_TOKEN_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledSupportPasscodeHash=${{ secrets.SUPPORT_PASSCODE_HASH }}'" -o ../src-tauri/bin/backend-x86_64-unknown-linux-gnu .
+          go build -trimpath -ldflags="$SIDECAR_LDFLAGS" -o ../src-tauri/bin/backend-x86_64-unknown-linux-gnu ./cmd/server
+
       - name: Build Go Sidecar (macOS)
         if: matrix.platform == 'macos-latest'
+        env:
+          SIDECAR_LDFLAGS: "-s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/internal/config.CompiledSupportPasscodeHash=${{ secrets.SUPPORT_PASSCODE_HASH }}'"
         run: |
           cd backend
-          go build -ldflags="-s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledAccessTokenSecret=${{ secrets.ACCESS_TOKEN_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledRefreshTokenSecret=${{ secrets.REFRESH_TOKEN_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledSupportPasscodeHash=${{ secrets.SUPPORT_PASSCODE_HASH }}'" -o ../src-tauri/bin/backend-x86_64-apple-darwin .
-          GOARCH=arm64 go build -ldflags="-s -w -X 'github.com/chrisostomemataba/balceinv-api/license.LicenseSecret=${{ secrets.BALCE_LICENSE_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledAccessTokenSecret=${{ secrets.ACCESS_TOKEN_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledRefreshTokenSecret=${{ secrets.REFRESH_TOKEN_SECRET }}' -X 'github.com/chrisostomemataba/balceinv-api/config.CompiledSupportPasscodeHash=${{ secrets.SUPPORT_PASSCODE_HASH }}'" -o ../src-tauri/bin/backend-aarch64-apple-darwin .
-        # Compiles matching sidecars for both Intel and Apple Silicon Macs
+          CGO_ENABLED=1 GOARCH=amd64 go build -trimpath -ldflags="$SIDECAR_LDFLAGS" -o ../src-tauri/bin/backend-x86_64-apple-darwin ./cmd/server
+          CGO_ENABLED=1 GOARCH=arm64 go build -trimpath -ldflags="$SIDECAR_LDFLAGS" -o ../src-tauri/bin/backend-aarch64-apple-darwin ./cmd/server
 
       # 3. Setup pnpm and Node Environment
       - name: Install pnpm
