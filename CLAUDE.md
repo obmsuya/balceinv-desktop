@@ -5,13 +5,31 @@ written today, not an aspirational style guide — match what's already here.
 
 ## Stack
 
-- **Shell**: Tauri v2 (`src-tauri/`, Rust). Ships a Go binary as an
-  `externalBin` sidecar (`bin/backend`).
-- **Backend**: Go 1.25, Fiber v2, GORM over SQLite (`glebarez/sqlite`).
-  Layered `handlers/ → services/ → repository/ → models/`.
-- **Frontend**: Nuxt 4 / Vue 3 `<script setup lang="ts">`, shadcn-vue
-  components, `vue-sonner` for toasts, one composable per domain
-  (`useProducts`, `useSettings`, `usePrint`, …).
+- **Shell**: Tauri v2 (`src-tauri/`, Rust). Ships the Go server
+  (`backend/cmd/server`) as an `externalBin` sidecar (`bin/backend`) and
+  bundles the generated frontend so LAN tills can load it.
+- **Backend** (`backend/`, module `balceinv-api`): Go 1.26, Fiber v2,
+  `database/sql` with raw SQL on two engines: SQLite through
+  `modernc.org/sqlite` on the desktop and Postgres through `pgx` in the
+  cloud. golang-migrate runs the embedded migrations in
+  `migrations/{sqlite,postgres}` at startup. There is no ORM.
+  - Layout: `cmd/server` (the app), `cmd/admin` (cloud company setup),
+    `internal/<feature>/` with `domain.go`, `dto.go`, `repository.go`,
+    `service.go`, `handler.go`, and `internal/common/` for shared pieces
+    (database, httpx, response, storage…). The root `license/` package is
+    the desktop hardware-ID license.
+  - Every tenant table has `company_id`; Postgres enforces it with row-level
+    security, set per request in the transaction middleware.
+  - Tests: `testkit.ForEachEngine` runs each test on SQLite and, when
+    `TEST_DATABASE_URL` is set, on Postgres.
+- **Frontend** (`frontend/`): Nuxt 4 / Vue 3 `<script setup lang="ts">`
+  (SPA, `ssr: false`), shadcn-vue components, `vue-sonner` for toasts, one
+  composable per domain (`useProducts`, `useSettings`, `usePrint`, …).
+  - Text goes through `t()` from `useI18n()` (English and Kiswahili, JSON in
+    `app/locales/<lang>/<area>.json`).
+  - Swahili terms follow `app/locales/glossary.md`: notifications are
+    "taarifa".
+  - `node scripts/locales.check.ts` must pass.
 
 ## Go backend discipline
 
@@ -22,17 +40,13 @@ written today, not an aspirational style guide — match what's already here.
   immediately** — no `if err := f(); err != nil` chains stacked three deep.
   Wrap with `fmt.Errorf("... : %w", err)` so the caller/log has context.
 - **Handlers stay thin.** Parse/validate input, call one service method,
-  translate the result/error to `utils.Success` / `utils.Error`. Business
-  logic lives in `services/`, DB access in `repository/`.
-- **Comments explain *why*, not *what*.** See
-  `backend/services/print_service.go` (`buildReceipt`) and
-  `backend/models/settings.go` (printer field block) for the pattern: a
-  short comment above a field/func only when the reasoning isn't obvious
-  from the code itself (e.g. why a raw device path is expected, why a
-  buffer is passed instead of the bufio.Writer).
-- **GORM models list column mapping and defaults explicitly** —
-  `gorm:"column:x;default:y"` — even when it matches the zero value, because
-  the frontend forms rely on knowing the exact default.
+  translate the result/error to `response.Success` / `response.Error` with a
+  stable error `code` (the frontend translates by code). Business logic lives
+  in `service.go`, SQL in `repository.go`.
+- **No inline code comments** (the owner's rule). Names and small functions
+  carry the meaning.
+- **Migrations come in pairs per engine**, append-only, with explicit column
+  defaults, because the frontend forms rely on knowing the exact default.
 - No new dependency for something the stdlib or an already-imported package
   can do. The one exception worth taking: cross-platform serial/USB port
   enumeration has no reasonable stdlib equivalent (Windows registry vs.
