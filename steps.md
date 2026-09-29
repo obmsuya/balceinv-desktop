@@ -1191,25 +1191,138 @@ absent in cloud):
 
 ## Phase 9: switch-over and cleanup
 
-- [ ] Tauri builds `cmd/server`; the old `main.go`, `handlers/`,
-      `services/`, `repository/`, `models/`, `utils/jwt.go`, GORM and
-      `golang-jwt` are deleted.
-- [ ] `release.yml` ldflags point at
-      `internal/config.CompiledSupportPasscodeHash` (the old
-      `config.CompiledSupportPasscodeHash` goes with the old code).
-- [ ] Unused frontend dependencies removed after a grep proves them unused
-      (`@libsql/client`, `drizzle-orm`, `drizzle.config.ts`, `pg`,
-      `puppeteer-core`, `@sparticuz/chromium`, `jsonwebtoken`, `bcryptjs`,
-      `@iconify/vue` once `ModeToggle.vue` is gone).
-- [ ] Dead components deleted: `AppSidebar.vue` and `ModeToggle.vue`
-      (neither is used).
-- [ ] The "hidden until ported" nav list is deleted.
-- [ ] `CLAUDE.md` stack section updated (database/sql + pgx/modernc, no
-      GORM, the new layout).
-- [ ] Full regression on both engines; `/security-review` on the branch; a
-      macOS Tauri build; a Windows build checked manually.
+Backend: balceinv-api PRs #35–#48. Frontend: balceinv PRs #18–#22.
+Desktop: #19 (release and shell).
 
-**Verification performed:** _pending_
+- [x] Tauri builds `cmd/server`. Deleted from the backend:
+      - the root `main.go`, `backup/`, `config/`, `database/`, `handlers/`,
+        `middleware/`, `models/`, `repository/`, `routes/`, `services/`,
+        `utils/` and `cmd/seed`;
+      - the GORM, glebarez/sqlite and golang-jwt dependencies;
+      - the old `.env.template`.
+- [x] `release.yml` builds `./cmd/server`, and its ldflags point at
+      `license.LicenseSecret` and `internal/config.CompiledSupportPasscodeHash`.
+      A marker build proved both values land in the binary; the old
+      `config.` path sets nothing, silently. Also in `release.yml`:
+      - Go comes from `backend/go.mod`.
+      - The Intel Mac sidecar is really built for Intel. `macos-latest` is
+        Apple Silicon, so the old "x86_64" file was an ARM binary.
+- [x] Unused frontend packages removed after an import count:
+      `@libsql/client`, `drizzle-orm`, `drizzle-kit`, `pg`,
+      `puppeteer-core`, `@sparticuz/chromium`, `jsonwebtoken`, `bcryptjs`,
+      `dotenv`, `yup`, `@tanstack/vue-form`, `tsx`, `@iconify/vue`,
+      `@iconify-json/radix-icons`, three `@types`. Also deleted
+      `drizzle.config.ts` and a committed `frontend/balce.db`.
+- [x] Dead code deleted:
+      - `AppSidebar.vue` and `SidebarSection.vue` (Phase 8);
+      - `ModeToggle.vue`;
+      - `admin-page.vue`, the old "Super User" page behind Ctrl+Shift+D. It
+        could only fail against the new `/api/setup`.
+- [x] The "hidden until ported" route list is deleted. Unknown addresses go
+      to the person's home page.
+- [x] `CLAUDE.md` describes the new stack (database/sql with modernc and
+      pgx, migrations, the `internal/<feature>` layout, i18n) and the
+      owner's no-inline-comments rule.
+- [x] Full regression on both engines, a security review, and a macOS
+      desktop build (`cargo build --release`, launched and driven, below).
+      A Windows build is still for a person to check.
+
+**Found and fixed during the switch-over:**
+- **The backend outlived the app.** Killing the app (a crash, or
+  force-quit from Task Manager) left the backend holding port 8080, so the
+  next launch broke. The app now starts it with `BALCE_EXIT_WITH_PARENT=1`;
+  the backend watches its stdin and shuts down cleanly when the pipe
+  closes (#37, #38).
+- **Old data after an update:** the new app keeps its data in
+  `balce.sqlite`; the old app used `balce.db`. Setup now warns when the old
+  file is on the computer, in English and Kiswahili (#36, balceinv #19).
+- **The pay button was hidden from owners.** It checked the old role name
+  `Admin` (balceinv #20).
+
+**Security review (fixed):**
+
+| Severity | Finding | Fix |
+|---|---|---|
+| High | Windows path traversal in the static app server (`/..\..\…\balce.sqlite`) with LAN on | #39 |
+| High | License routes (hardware ID, pay) open without sign-in | #40 (+ balceinv #20) |
+| Medium | DNS rebinding: any `Host` accepted, `X-Forwarded-*` trusted | #41 |
+| Medium | Printer "port" could be any file or UNC path | #42 (+ balceinv #21) |
+| Medium | `users:edit` could give roles or reset passwords above their own permissions | #43 |
+| Medium | Cloud backup list leaked download links to `settings:view` | #44 (+ balceinv #22) |
+| Medium | Sign-in held the only SQLite writer during bcrypt; no per-address limit | #45 |
+| Medium (cloud) | EFD endpoint allowed SSRF to internal addresses and followed redirects | #47 |
+| Medium (cloud) | Team catalog tools could wipe the shared list for every tenant | #48 |
+| Low | Removed from a shop but kept working in it until the session ended | #46 |
+| Low | `sales:view` could open the cash drawer | #44 |
+
+**Security review (still open, needs a decision or other work):**
+- **Licensing server (Django):** it hands out the license key and lists
+  cloud backups from the hardware ID alone. Balce now keeps the ID behind
+  sign-in, but the server side needs a per-install secret, and backups
+  should be encrypted on the client.
+- **Passwords:**
+  - Changing your own password doesn't ask for the current one.
+  - An admin reset doesn't force a new password at next sign-in, and
+    nothing enforces `must_change_password`.
+  - All three need a small screen in the app.
+- **LAN mode is plain HTTP,** so cookies and sign-ins can be sniffed on
+  shared shop Wi-Fi. Keep the shop Wi-Fi private, or add TLS later.
+- **Cloud deploy round:** trusted proxies and `ProxyHeader` behind Caddy,
+  so rate limits see the real client address.
+- **The backend repo still has a stale `.github/workflows/release.yml`**
+  (it builds `./balceinv-api`, which doesn't exist). Deleting it was
+  refused by the permission check on CI files, so it's left for the owner.
+
+**Before tagging a release for existing customers:** the importer from the
+old `balce.db` is not built yet (it's planned after accounting). Until it
+is, customers who update will see the setup warning and must not set up a
+new business. **Don't tag a release for live shops before the importer
+exists.**
+
+**Verification performed (2026-09-29):**
+- **Backend:** `go build ./...`, `go vet ./...`, and `go test ./...` with
+  `TEST_DATABASE_URL` set: all 25 packages pass on SQLite and Postgres.
+  Every fix above has a test that fails without it or pins the rule. Also
+  checked:
+  - a parent process that dies abruptly makes the server exit, with
+    `shutting down reason="the desktop app closed"` in its log file;
+  - without the flag, the server keeps running;
+  - the sidecar cross-builds for macOS arm64 and x86_64 (`file` shows each
+    architecture), Windows (PE32+ GUI) and Linux.
+- **Frontend:** `pnpm build`, `pnpm generate`,
+  `node scripts/locales.check.ts` and `node scripts/mobileMoney.check.ts`
+  pass. In the browser against a local backend:
+  - the setup warning appears with an old `balce.db` and disappears
+    without it;
+  - an unknown address signed out lands on sign-in.
+- **Desktop:** `cargo build --release --features tauri/custom-protocol`
+  with the new sidecar, launched with an isolated HOME:
+  - `/health` answered on 127.0.0.1:8080, listening locally only;
+  - `old_data_found: true` with an old file present;
+  - setup started a 14-day trial;
+  - sign-in and a sale worked (receipt SALE-20260929-0001);
+  - a request with `Host: evil.example.com` got 403;
+  - the hardware ID without sign-in got 401;
+  - `kill -9` of the app stopped the backend within 1 s, and a normal
+    quit stopped both.
+
+**Manual follow-up required:**
+- **Windows:**
+  - Build the installer through the release workflow (a pre-release tag
+    on a test repo or `workflow_dispatch`).
+  - Install it, run first setup, sell, and print.
+  - End the app from Task Manager and check that "backend" disappears
+    from the process list and the app starts again cleanly.
+  - With Settings → Network on, try `curl --path-as-is
+    "http://<pc-ip>:8080/..\..\..\Roaming\com.balceinv.app\balce.sqlite"`
+    from another machine. It must answer 404.
+- **Intel Mac:** check that the x86_64 build starts its backend (the
+  previous releases shipped an ARM backend there).
+- **Printer ports on Windows:** a USB thermal printer shared as
+  `\\localhost\POS58`, and a COM-port printer, both print from Settings →
+  Hardware → Test print.
+- **Delete the stale workflow:** delete `backend/.github/workflows/release.yml`
+  in balceinv-api if you agree.
 
 ## Manual follow-up required
 _Collected from the phases above as they complete._
