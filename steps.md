@@ -723,9 +723,9 @@ tie), never on a wholesale-priced line and never on add-ons.
       pickers, three held carts per shop, payment dialog), sales history
       with totals and reprint. Sellers land on the till after sign-in.
 - [ ] Left out on purpose, add when asked: a cashier's manual discount on a
-      line (needs its own permission and audit), forcing retail on a
-      wholesale-sized line, the on-screen numpad, the customer display
-      window and EFD submission.
+      line (needs its own permission and audit) and forcing retail on a
+      wholesale-sized line. The numpad, customer display and EFD
+      submission landed in Phase 5b.
 
 **Edge-case tests** (SQLite and Postgres as a non-superuser):
 - [x] Replay the same body → same sale, stock decremented once; same
@@ -779,6 +779,97 @@ tie), never on a wholesale-priced line and never on add-ons.
 so a till that loses its storage mid-retry could record a second sale;
 the receipt page relies on the browser's print dialog until Phase 7 wires
 the serial printer.
+
+---
+
+## Phase 5b: till redesign and till extras
+
+Feedback on Phase 5: the cart felt slow, cramped and not thought
+through. Asked for: a redesign, plus the on-screen number pad, the customer
+display and EFD submission, each switched on only where needed.
+
+- [x] Till redesign (`pages/pos/index.vue`, `components/pos/CartPanel.vue`,
+      `ProductGrid.vue`, `composables/useTillQuote.ts`): totals show at
+      once from the last quote (dimmed until confirmed); out-of-order quote
+      answers are ignored; Pay waits for the confirmed total; compact tiles
+      with stock and tap feedback; "Show more" past 50 products; cart beside
+      the products from 768 px; F2 / F9 / Esc; the scan box gets focus back
+      after each add on mouse and keyboard tills; notes; clearing a cart has
+      Undo.
+- [x] Switches `till_numpad_enabled` and `customer_display_enabled`
+      (migration 000021, off by default) in Settings → Hardware → Till
+      extras; `GET /api/sales/till` gives sellers the switches plus
+      `efd_enabled` and `print_receipt_automatically`.
+- [x] Number pad (`components/pos/NumberPad.vue`): set a selected line's
+      quantity, or type a number and tap or scan a product to add that
+      many; the payment screen's keypad types into the chosen method.
+- [x] Customer display (`pages/display/index.vue`,
+      `composables/useCustomerDisplay.ts`): a second window (a Tauri
+      window on desktop; `core:webview:allow-create-webview-window` added
+      to `src-tauri/capabilities/default.json`) showing the lines, savings
+      and total, then paid and change, then a welcome screen. It follows
+      the till through BroadcastChannel, the `storage` event and a 1 s poll.
+      No sign-in; it only shows what this browser's till published.
+- [x] EFD (backend `internal/sales/fiscal*.go`, migrations 000022–000023):
+      while EFD is on, each sale is queued in `fiscal_receipts` in the sale's
+      transaction; `POST /api/sales/:id/fiscal` and
+      `POST /api/sales/fiscal/send-waiting` post it as JSON with
+      `Authorization: Bearer <key>` and `Idempotency-Key: <sale id>` outside
+      the request transaction (short claim → HTTP → short record), so a slow
+      EFD never holds the SQLite writer. A claim makes delivery happen once;
+      a `sending` row is reclaimable after 2 minutes. A 2xx answer may return
+      `verification_code` and an https `verification_url`. The till sends
+      after each sale, on opening and every 5 minutes; Sales History filters,
+      shows and resends; receipts print the code and a QR code. Turning EFD
+      on without an address and key is refused.
+- [x] "Print automatically after sale" now works at the till; receipts
+      print the note; EFD can be switched off (its Save button used to
+      disappear with the form); the logo no longer covers the shop switcher
+      on phones.
+
+**Edge-case tests** (SQLite and Postgres as a non-superuser):
+- [x] Till switches default off, a cashier sees the owner's change, 403
+      without `sales:create`, switching one off leaves the other.
+- [x] A sale made while EFD was off is never sent (409).
+- [x] EFD refusing (503) or unreachable leaves the sale saved and the
+      receipt `failed` with a readable error, listed by `?fiscal=waiting`;
+      send-waiting then clears the list.
+- [x] A sent receipt is not sent again; five tills sending the same sale
+      at once reach the EFD once.
+- [x] The EFD key never appears in any response; another company can't
+      send the receipt; `fiscal_receipts` is in the tenant isolation test.
+- [x] Turning EFD on without a key → 400.
+
+**Verification performed (2026-09-29):**
+- `go vet` clean; `TEST_DATABASE_URL=… go test -count=1 ./...` → every
+  package passes; the EFD test also passes under `-race` on both engines.
+- `pnpm build` passes.
+- Browser at 1366, 820 and 375 px against the local backend (upgraded to
+  v23 on start):
+  - **Cart:** adding Sugar showed the discounted total at once. Pushing
+    it past stock showed "Only 5 kg left" and blocked Pay and F9. Changing
+    a quantity and pressing F9 in the same moment opened payment with the
+    right total in 24 ms. Clear then Undo restored the cart.
+  - **Till extras switched on in Settings:** "tap a line, 2, Set" made
+    the quantity 2. "3, then Coca Cola, Standard" added 3. The payment
+    keypad typed 20000; change 10,520, receipt `KKO-20260929-0001`.
+  - **Customer display** in a second tab showed the two lines, "You save
+    TZS 720" and TZS 9,480, then Paid 20,000 / Change 10,520, then idle
+    after Next sale.
+  - **EFD pointed at an unreachable https address:** the sale completed
+    and showed "EFD failed / Try again". Sales History showed the badge,
+    the "Waiting for EFD" filter, and the error with 1 attempt. The
+    receipt said "EFD receipt to follow". EFD was switched off again from
+    Settings.
+- Found and fixed while verifying: Pay pressed during a reprice did
+  nothing (it now settles the quote first); the EFD card couldn't save
+  "off".
+
+**Known limits:** the EFD payload is Balce's own JSON contract. A direct
+TRA VFD connection (signed XML, registration and token) or a specific EFD
+box needs that provider's spec or a small adapter that accepts this JSON.
+The customer display follows a till in the same browser or desktop app,
+not a separate tablet.
 
 ---
 
@@ -875,6 +966,20 @@ succeed.
 
 ## Manual follow-up required
 _Collected from the phases above as they complete._
+
+- **Phase 5b, till extras on real hardware:**
+  - **Touch till:** use the number pad with fingers and check the keys
+    are big enough and nothing covers the cart.
+  - **Customer screen, web:** plug in a second monitor, press "Customer
+    screen", drag the window to it and press F11. It must follow the till
+    within a second and show Paid/Change after the sale.
+  - **Customer screen, desktop app:** in a Tauri build, the same button
+    must open a separate window, and a second press must focus it instead
+    of opening another.
+  - **EFD:** once the client has their EFD provider's address and key,
+    make one sale and confirm the provider received it. The receipt must
+    print the verification code and a QR code that opens the verification
+    page on a phone.
 
 - **Phase 5, a real printer and till:** print a receipt from a LAN till
   (a second computer or phone on the same network) and from the cloud on
