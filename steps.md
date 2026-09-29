@@ -1109,18 +1109,83 @@ absent in cloud):
 
 ## Phase 8: languages (en, sw)
 
-- [ ] `useI18n`: `t(key, params)`, JSON dictionaries, per-user locale with
-      a company default, `Intl` for numbers and dates.
-- [ ] API errors carry a stable `code`; the frontend translates by code.
-- [ ] Every page moved to `t()`; browser receipts translated; desktop
-      serial receipts use a label map chosen by `settings.receipt_language`.
+- [x] `app/utils/translate.ts` (pure) and `app/utils/i18n.ts` provide:
+      - `t(key, params)` over JSON dictionaries in `app/locales/<lang>/<area>.json`
+        (22 areas, 1,459 keys in each language), with `{one, other}` plurals;
+      - `translateIn(locale, key)` for receipts;
+      - `Intl` formatting (`en-TZ` / `sw-TZ`) for money, dates, numbers and "5 min ago".
+- [x] Language choice, in order: the person's own language
+      (`PUT /api/auth/language`, `users.locale`), then the business language
+      (`default_locale`), then English.
+      - A choice made on the sign-in page is kept in `localStorage`.
+      - Someone with no saved language keeps the pick they made before signing in,
+        and it is saved to their account.
+- [x] A language button in the header on tablets and computers. On phones it
+      is in the account menu, together with the theme.
+- [x] API errors are translated by their `code` (`errors.json`, 60 codes). In
+      English the server's own message is shown; in Swahili the code's translation,
+      or else the screen's own "Imeshindwa …" message, never English.
+- [x] Every page and composable uses `t()`. Nothing translated is frozen at
+      load time, so switching language updates the page (and charts) without a reload.
+- [x] Receipts:
+      - Browser receipts follow `settings.receipt_language` through
+        `translateIn`.
+      - Desktop serial receipts use the matching label map in
+        `internal/printing/receipt.go`.
+      - Both controls are new on Settings → Business → Language.
+- [x] `app/locales/glossary.md` fixes the Swahili terms. Notification is
+      **taarifa** (never "arifa"); also stoku, taslimu, chenji, keshia,
+      msimbopau, changanua (scan), tendua (undo), lipia upya (renew) and
+      makusanyo (takings). `scripts/locales.check.ts` refuses the banned words.
 
 **Edge-case tests:**
-- [ ] A missing key falls back to English and is never shown blank.
-- [ ] Switching language updates the page without reload.
-- [ ] Swahili strings don't break the layout at 375 px.
+- [x] A missing key falls back to English, and a key missing everywhere shows
+      the key, never a blank: asserted in `scripts/locales.check.ts`.
+- [x] Switching language updates the page without a reload (browser: the
+      dashboard switched from Swahili to English in place, with one navigation entry).
+- [x] Swahili strings don't break the layout at 375 px:
+      - dashboard, POS, products, stock, sales, reports, settings, users,
+        roles and notifications all have `scrollWidth` = viewport and no
+        English text left;
+      - the header was fixed on the way (the account button ran off the edge
+        and the shop switcher overlapped the menu button).
 
-**Verification performed:** _pending_
+**Verification performed (2026-09-29):**
+- Backend: `go test ./...` (SQLite and Postgres) and `go vet ./...` pass;
+  `TestEachUserChoosesTheirOwnLanguage` covers saving, isolation between
+  users, refusing `fr`, and `null` for the company default.
+- Frontend: `node scripts/locales.check.ts` passes, checking:
+  - the same keys and placeholders in both languages, with no empty values;
+  - no banned words;
+  - every `t('…')` key and error fallback in the app exists.
+  `node scripts/mobileMoney.check.ts`, `pnpm build` and `pnpm generate` pass.
+- Every Swahili string was read through and corrected for consistency and
+  noun-class agreement.
+- Browser, against a local backend with an isolated data folder:
+  - Kiswahili picked on the sign-in page; a wrong password showed
+    "Barua pepe au nenosiri si sahihi"; the choice was kept after signing in
+    and saved (`/api/auth/me` → `sw`).
+  - A sale completed in Swahili (Pokea malipo → Chenji ya kurudisha TSh 4,000).
+  - The receipt stayed English while the receipt language was English, then
+    printed in Swahili after the switch in Settings ("Mipangilio imehifadhiwa").
+  - The layout checks at 375 px listed above.
+  - No console errors. A pre-existing one (the till posting to a closed
+    customer-screen channel) was fixed.
+
+**Known limits:**
+- The server's English-only texts stay English in the Swahili app: the reasons
+  in product-import problem tables, exchange-rate problems not in the known list,
+  and plan names.
+- Seeded role names ("Owner", "Cashier") are business data and are not
+  translated.
+- Date pickers use the browser's own format.
+
+**Manual follow-up required:**
+- In the desktop app, pick Kiswahili and print a receipt on the thermal
+  printer with the receipt language set to Kiswahili. Check the wording matches
+  the screen receipt.
+- Ask a Swahili-speaking cashier to use the till for a day and note any word
+  that reads oddly. Changes go in `app/locales/sw/*.json` and the glossary.
 
 ---
 
