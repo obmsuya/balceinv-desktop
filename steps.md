@@ -672,41 +672,113 @@ reopening either fixes it. Revisit if that ever happens.
 
 ## Phase 5: discounts and sales (POS)
 
-**Tables:** `discounts` (percent in basis points or a fixed amount),
-`sales` (`client_ref` unique per company, subtotal, discount, tax, total,
-paid, change), `sale_items` (product name, unit price and **unit cost**
-snapshotted), `sale_item_addons`.
+**Tables:** `discounts` (percent in basis points 1–10000 or a fixed amount
+off each unit, one product or every product, `starts_at`–`ends_at`),
+`sales` (`client_ref` unique per company, receipt number unique per shop,
+subtotal, discount, total, tax, paid, change, currency and tax rate
+snapshotted; the database checks `total = subtotal − discount` and
+`paid = total + change`), `sale_items` (name, SKU, unit price and **unit
+cost** snapshotted; line total checked), `sale_item_addons`,
+`sale_payments` (cash / card / mobile). Forced RLS on all five.
 
-- [ ] `POST /api/sales`: the server recomputes every price, discount and
-      tax from the database; ignores prices sent by the client; takes the
-      receipt number from the shop counter; updates stock, inserts the
-      sale, items and movements, and raises alerts, all in one
-      transaction.
-- [ ] Replaying the same `client_ref` returns the original sale with its
-      original status.
-- [ ] Tax-inclusive calculation in integers, with the rounding rule written
-      down here once it's decided and tested.
-- [ ] Browser receipt page (80 mm) for LAN tills and cloud; the desktop
-      serial print path stays the same.
-- [ ] POS generates `client_ref` per checkout with
-      `crypto.randomUUID()`.
+**Merged:** balceinv-api #21 (schema), #22 (discounts), #23 (sales),
+#24 (currency lock), #25 (product lookup); balceinv #7 (discounts page),
+#8 (till, sales history, receipts).
 
-**Edge-case tests:**
-- [ ] Replay the same body → same sale, stock decremented once; same
+**The rounding rule:** prices include tax. Tax on a sale is
+`round_half_up(total × r ÷ (10000 + r))` with `r` in basis points,
+computed once on the sale total in minor units (big integers, so large
+amounts can't overflow). Percent discounts are
+`round_half_up(unit_price × quantity × bps ÷ 10000)` per line; fixed
+discounts take `min(amount, unit_price)` off each unit. Only the single
+best running discount applies to a line (a product-specific one wins a
+tie), never on a wholesale-priced line and never on add-ons.
+
+- [x] `POST /api/sales` recomputes every price, discount and tax from the
+      database and ignores anything price-like the client sends; takes the
+      receipt number from the shop counter (`{SHOP}-{DATE}-{COUNTER}`, date
+      in the company's timezone); inserts the sale, items, add-ons and
+      payments, moves stock and raises alerts, all in one transaction.
+- [x] Replaying the same `client_ref` and body returns the original sale
+      (201, same receipt); the same reference with a different body → 409
+      `client_ref_reused`; a racing duplicate → 409 `client_ref_in_flight`.
+- [x] `POST /api/sales/quote` gives the till the server's own totals, so
+      pricing lives in one place.
+- [x] Split payments; change only from cash; card and mobile money can't
+      exceed what is owed.
+- [x] Browser receipt page (`/receipts/:id`, 58 or 80 mm, English or
+      Swahili labels, `?print=1` prints on open) for LAN tills and cloud.
+      The desktop serial print path moves to Phase 7 with the rest of the
+      desktop work.
+- [x] The till generates the checkout reference with
+      `crypto.randomUUID()`, falling back to `crypto.getRandomValues`
+      because plain-HTTP LAN tills have no `randomUUID`. The reference is
+      kept until the sale lands and reset whenever the cart changes.
+- [x] Currency locked after the first sale (409 `currency_locked`); the
+      receipt format must contain `{COUNTER}`.
+- [x] `GET /api/products/lookup?code=` finds any product or variant by
+      barcode or SKU with the barcode's pack size (the list only returns
+      parents, so variants couldn't be scanned before).
+- [x] Discounts page, new till (grid, scan box, variant and add-on
+      pickers, three held carts per shop, payment dialog), sales history
+      with totals and reprint. Sellers land on the till after sign-in.
+- [ ] Left out on purpose, add when asked: a cashier's manual discount on a
+      line (needs its own permission and audit), forcing retail on a
+      wholesale-sized line, the on-screen numpad, the customer display
+      window and EFD submission.
+
+**Edge-case tests** (SQLite and Postgres as a non-superuser):
+- [x] Replay the same body → same sale, stock decremented once; same
       `client_ref` with a different body → 409.
-- [ ] Insufficient stock on any line → 409 and nothing written.
-- [ ] A tampered client price is ignored.
-- [ ] Expired or inactive discounts are not applied.
-- [ ] Wholesale price applies at `wholesale_min` and not one below.
-- [ ] Rounding: 1-unit items and 18% tax on awkward totals match the
-      written rule.
-- [ ] Cash paid below the total → 400.
-- [ ] Receipt numbers stay unique and gap-free per shop under 20 concurrent
-      sales.
-- [ ] Another company's product in the cart → 404, nothing written.
-- [ ] Changing the currency after this first sale → 409.
+- [x] Insufficient stock on the second line → 409 and nothing written (no
+      sale, no movement, the receipt counter not used: the next sale is
+      0002).
+- [x] A tampered client price, line total or sale total is ignored.
+- [x] Expired and stopped discounts are not applied; a running product
+      discount is.
+- [x] Wholesale applies at `wholesale_min` and not one below (unit and
+      HTTP).
+- [x] Rounding: 1-unit items, 12.5% off and 18% tax on awkward totals
+      match the rule; a fixed discount larger than the price stops at zero;
+      amounts up to 10^17 don't overflow.
+- [x] Cash below the total, no payment, card above the total and the same
+      method twice → 400.
+- [x] 20 concurrent sales get receipt counters 0001–0020 with no gaps and
+      leave the right stock, on both engines.
+- [x] Another company's product, or another product's add-on, in the cart
+      → 404 and nothing written.
+- [x] Changing the currency (code or decimals) after the first sale → 409;
+      other settings still save.
+- [x] A cashier with only `sales:create` can sell and print the receipt
+      but not list sales; another company gets 404 on every sale route.
+- [x] The sum of movements still equals `shop_stock` after sales.
 
-**Verification performed:** _pending_
+**Verification performed (2026-09-29):**
+- `go vet` clean; `TEST_DATABASE_URL=… go test -count=1 ./internal/...`
+  → every package passes, sales, discounts and lookup subtests confirmed
+  on sqlite and postgres.
+- `pnpm build` passes.
+- The Phase 4 preview database upgraded to v20 on start; its receipt
+  format moved to `{SHOP}-{DATE}-{COUNTER}`.
+- Browser against the new backend (pane hidden, driven through the DOM):
+  a 10% Sugar discount created through the form showed as Running;
+  at the till, Sugar's barcode was scanned and the 1-litre Coca Cola
+  picked from the variant dialog; the server quote showed the discount;
+  the payment dialog offered Exact / 12,000 / 15,000 / 20,000; 20,000 cash
+  on 11,520 gave 8,480 change and receipt `SALE-20260929-0001`; the
+  receipt page rendered at 80 mm with the discount, 1,757 VAT included,
+  payment and change; stock dropped by 3 and the cart emptied; sales
+  history showed the same totals and details. At 375 px the till uses a
+  bottom bar and a cart sheet with no sideways scroll. No console errors.
+- Found and fixed while building: the till couldn't scan variants (added
+  the lookup endpoint); `randomUUID` is missing on plain-HTTP LAN tills
+  (added the fallback); sign-in sent sellers to Products (now the till,
+  based on `sales:create`).
+
+**Known limits:** the checkout reference lives in the browser's storage,
+so a till that loses its storage mid-retry could record a second sale;
+the receipt page relies on the browser's print dialog until Phase 7 wires
+the serial printer.
 
 ---
 
@@ -803,6 +875,12 @@ succeed.
 
 ## Manual follow-up required
 _Collected from the phases above as they complete._
+
+- **Phase 5, a real printer and till:** print a receipt from a LAN till
+  (a second computer or phone on the same network) and from the cloud on
+  an 80 mm thermal printer through the browser dialog; check the width,
+  the logo and that nothing is cut off. Scan a real barcode with a USB
+  scanner at the till and confirm one scan adds one item.
 
 - **Phase 4, look and feel:** the pane was hidden during verification, so
   open /stock, /shops and /notifications in light and dark at phone and
