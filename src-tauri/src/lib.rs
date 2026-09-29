@@ -41,7 +41,13 @@ pub fn run() {
         )
         .setup(|app| {
             let shell = app.shell();
-            let sidecar_command = shell.sidecar("backend").expect("backend sidecar not found");
+            let mut sidecar_command = shell.sidecar("backend").expect("backend sidecar not found");
+            if let Ok(resource_directory) = app.path().resource_dir() {
+                let static_directory = resource_directory.join("frontend");
+                if static_directory.join("index.html").exists() {
+                    sidecar_command = sidecar_command.env("BALCE_STATIC_DIR", static_directory);
+                }
+            }
 
             let (mut receiver, child) = sidecar_command
                 .spawn()

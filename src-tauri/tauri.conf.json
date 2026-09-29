@@ -45,6 +45,9 @@
       "nsis": {
         "installerHooks": "./windows/hooks.nsh"
       }
+    },
+    "resources": {
+      "../frontend/.output/public/": "frontend/"
     }
   },
   "plugins": {
