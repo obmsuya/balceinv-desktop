@@ -456,33 +456,115 @@ and `S3_BUCKET=balce-media`; the access key and secret are already there.
 
 **Tables:** `products` (parent/variant, price/cost/wholesale in minor
 units, `image_key`, `metadata`, `is_active`), `barcodes`, `price_history`,
-`product_addons`, `catalog_products` (platform-wide).
+`product_addons`, `catalog_products` (platform-wide), `shop_stock` and
+`stock_movements` (the stock core Phase 4 builds on).
 
-**Routes kept:** all of `/api/products/*`, `/api/addons/*`,
-`/api/catalog*`, the image-upload session routes.
+**Merged:** balceinv-api #11 (schema), #12 (media + stock core), #13
+(products API), #14 (catalog + team tools), #15 (restore), #16 (error
+message case); balceinv #3 (products page).
 
-- [ ] List: paginated; search by name, SKU or barcode; category filter.
-      One page query + one barcode batch query + stock for the active shop
-      joined in.
-- [ ] Deleting a product that has ever sold archives it (`is_active =
-      false`) instead of deleting it.
-- [ ] Excel import: validate every row first; any error returns the row
-      list and imports nothing; valid files import in one transaction.
-- [ ] The Excel template actually downloads (the success toast fires only
-      after the file is written).
-- [ ] Price changes write `price_history` in the same transaction.
+- [x] List: paginated (`limit`/`offset`, total); search by name, SKU or
+      exact barcode; category filter; `include_archived`. One count, one
+      page query with the active shop's stock joined in, one barcode
+      batch query.
+- [x] Delete archives the product and its variants (`is_active = false`);
+      `POST /api/products/:id/restore` brings both back. Nothing is ever
+      hard-deleted, so a product that has sold keeps its history.
+- [x] Excel/CSV import: every row checked first (header aliases, messy
+      money like `TSh 1,500` or `3000/=`, the company's currency
+      decimals); any problem → 422 `import_rejected` with
+      `{row, column, problem}` and nothing saved; a clean file imports in
+      the request transaction with opening stock movements.
+- [x] Template downloads in the browser and in Tauri; the success toast
+      fires only after the file is saved (`utils/download.ts`, shared
+      with the catalog template and JSON export).
+- [x] Price changes write `price_history` in the same transaction.
+- [x] Images: ≤ 2 MB, type sniffed from the bytes, stored under
+      `products/<company>/…`, served from `/api/media/products/…`.
+- [x] Add-ons per product (unique name per product, on/off, delete).
+- [x] Common products (`internal/catalog`): `GET /api/catalog` returns the
+      list for the company's business type; prices are whole currency
+      units. Team tools (`/api/catalog/team/{summary,items,template,
+      import}`, `DELETE /api/catalog/team`) need sign-in plus
+      `X-Support-Passcode` (SHA-256 in `BALCE_SUPPORT_PASSCODE_HASH` or
+      compiled in; 5 wrong tries lock for a minute; 503 when unset).
+      Merge or replace; bad rows are skipped and listed; 422 when no row
+      is usable. Saved in batched upserts of 500.
+- [x] Seed lists moved to `internal/catalog/seeds`; empty lists are
+      filled from them at startup (the shipped files are still empty).
+- [x] One spreadsheet reader (`internal/common/spreadsheet`) for both
+      imports: .xlsx, CSV with BOM, semicolon CSV.
+- [x] Error messages are capitalised once in `response.Error`, so every
+      toast reads as a sentence.
+- [x] Frontend: products page rebuilt (server paging and search, category
+      filter, show archived, create / edit / add variant / archive /
+      restore, photo upload, barcodes with pack size, extra details,
+      add-ons tab, details dialog showing every field, import dialog with
+      the problem table). Catalog picker and team tools on the new API;
+      `formatShillings` gone from them. `/products` is ported and is the
+      home page for anyone who can view products.
+- [ ] Phone photo upload by QR: the session routes were not carried over;
+      they return with LAN mode in Phase 7.
+- [ ] Stock value and low-stock cards: dropped from the products page
+      until Phase 4 adds server-side totals (a page-only sum would lie).
 
-**Edge-case tests:**
-- [ ] The same SKU or barcode in two companies is fine; within one company
-      → 409.
-- [ ] A variant whose parent belongs to another company → 404.
-- [ ] Negative price or cost → 400; zero price is allowed.
-- [ ] 1,000-row import completes in one transaction; one bad row → nothing
-      imported and the row number reported.
-- [ ] List of 200 products runs ≤ 3 queries.
-- [ ] Deleting a sold product archives it.
+**Edge-case tests** (SQLite and Postgres as a non-superuser):
+- [x] The same SKU in two companies is fine; within one company (any
+      case) → 409; a barcode taken in the company → 409 and no product is
+      left behind.
+- [x] A variant whose parent belongs to another company → 404; a variant
+      of a variant or without a label → 400.
+- [x] Negative price → 400; zero price is allowed; nested metadata and a
+      repeated barcode → 400.
+- [x] 1,000-row import completes with 3,000 units of opening stock; one
+      bad row → nothing imported and rows 3–7 reported by column; wrong
+      type, no price column, header only → 400.
+- [x] Listing 25 of 200 products runs ≤ 3 queries.
+- [x] Archive hides the product and its variants; restore brings both
+      back; every product route answers 404 to another company.
+- [x] Oversell: parallel sales of 1 unit against stock 5 → exactly 5
+      succeed on both engines.
+- [x] Catalog: messy sheet parsing (6 rows read, 2 kept, problems on rows
+      5, 6, 7, 9), price parsing (`99.5` → 100, `free`/`NaN`/`1e20`/`-5`
+      rejected), seeding only fills empty valid lists, merge vs replace
+      counts, template round trip, another business type never leaks into
+      a company's list, a rejected replace leaves the list untouched,
+      1,200 rows across batches, company list ≤ 6 queries, wrong passcode
+      403, signed out 401, sixth guess locked out even with the right
+      passcode.
+- [ ] Archiving a product that has sold: re-checked in Phase 5 once sales
+      exist (delete already never removes rows).
 
-**Verification performed:** _pending_
+**Verification performed (2026-09-29):**
+- `go build ./... && go vet ./internal/... ./cmd/...` clean;
+  `TEST_DATABASE_URL=… go test -count=1 ./internal/... ./cmd/...` → every
+  package passes, catalog subtests confirmed on sqlite and postgres.
+- `pnpm build` passes.
+- Browser pane against the new backend (desktop mode, fresh database,
+  catalog imported through the team API with a test passcode): picking
+  "Sugar 1kg" fills name, `GEN-` SKU, category, unit, price and the Brand
+  detail; the product saves with 20 kg opening stock; edit changes the
+  price and adds a barcode while metadata and stock stay; an add-on is
+  added and switched off (saved `is_active: false`); a 1-litre variant is
+  created and the parent shows the variant badge; archive hides it,
+  "Show archived" shows it dimmed, restore brings it and its variant
+  back; a broken CSV shows three problems by row and column and saves
+  nothing; the web template download saves a 6.3 KB xlsx; exact barcode
+  search finds one product; a photo uploaded through the form and one
+  through the API both load as thumbnails from `/api/media`; light,
+  dark and 375 px with no horizontal scroll (image and category columns
+  hide on phones). No console warnings from the new components.
+- Found and fixed while checking: restore through a full `PUT` would have
+  left variants archived, so restore became its own endpoint; lowercase
+  API messages in toasts; double page padding and wrapped stock badges
+  on phones.
+
+**Known limits:** `GET /api/catalog` returns the whole list for the
+business type (at most 20,000 rows per import) and the picker searches it
+in the browser; switch to server search if a list grows past that. Team
+tools are opened from the desktop-only Updates tab, so the cloud catalog
+has no web entry point yet; add one when the team first needs to manage
+cloud lists.
 
 ---
 
@@ -628,6 +710,9 @@ succeed.
 - [ ] Tauri builds `cmd/server`; the old `main.go`, `handlers/`,
       `services/`, `repository/`, `models/`, `utils/jwt.go`, GORM and
       `golang-jwt` are deleted.
+- [ ] `release.yml` ldflags point at
+      `internal/config.CompiledSupportPasscodeHash` (the old
+      `config.CompiledSupportPasscodeHash` goes with the old code).
 - [ ] Unused frontend dependencies removed after a grep proves them unused
       (`@libsql/client`, `drizzle-orm`, `drizzle.config.ts`, `pg`,
       `puppeteer-core`, `@sparticuz/chromium`, `jsonwebtoken`, `bcryptjs`,
@@ -644,3 +729,11 @@ succeed.
 
 ## Manual follow-up required
 _Collected from the phases above as they complete._
+
+- **Phase 3, desktop app (needs a Tauri build of `cmd/server` with
+  `BALCE_SUPPORT_PASSCODE_HASH` or the compiled hash set):** in Settings →
+  Updates, tap the version seven times, enter the team passcode, import a
+  common-products sheet, then open Products → Add product and check the
+  picker lists it. Also click Template on the products page and in team
+  tools: a native save dialog must open and the saved `.xlsx` must open
+  in Excel. The browser path is verified; the Tauri save dialog is not.
