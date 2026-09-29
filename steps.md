@@ -63,8 +63,12 @@ Cloudflare Origin Certificate) and **Woodpecker CI**. Hardware: Ubuntu
 - [x] 1 GB swap file, `vm.swappiness=10`. Timezone was already UTC.
 - [x] **Password SSH stays enabled, by the owner's decision** (a
       non-technical client needs it). ufw rate-limits port 22 instead.
-- [ ] Package updates and unattended security upgrades: waiting for the
-      owner's go-ahead in this session.
+- [x] Package updates: 35 upgraded (including Docker 29.2.1); every
+      container came back and faltasi answered 200 locally and through
+      Cloudflare. Unattended upgrades on, security channel only, no
+      automatic reboot.
+- [ ] Reboot pending for kernels 6.14.0-35 to -37 and libc (they were
+      installed before this round). Ask the owner before rebooting.
 - [ ] Ubuntu 25.04 has had no security updates since January 2026.
       Upgrade to 26.04 LTS later, **after a provider snapshot**, in a
       maintenance window (runbook to be written).
@@ -245,69 +249,121 @@ the old `config/` package is still in use; it moves in Phase 9.
 
 ## Phase 1: tenancy core and auth (first usable slice: set up, log in, manage users)
 
-**Tables:** `companies`, `shops`, `permissions` (global, seeded by
-migration), `roles` (per company), `role_permissions`, `users`,
-`user_permissions`, `user_shops`, `sessions`, `login_attempts`.
+Backend: balceinv-api PRs #7 (schema), #8 (auth, users, roles), #9 (admin
+command and legacy-database guard). Frontend: balceinv PR #1.
 
-Postgres only: RLS policies with `FORCE` on every tenant table. The
-request transaction sets `app.company_id`.
+**Schema** (both engines, one pair of files per table):
+- [x] `shops`, `permissions` (40 seeded `resource:action` rows),
+      `roles` (one owner role per company), `role_permissions`, `users`,
+      `user_permissions`, `user_shops`, `sessions` (hash only),
+      `login_attempts`.
+- [x] Child rows use composite keys `(company_id, id)`, so the database
+      rejects cross-company references. Uniqueness is per company for
+      role and shop names; emails are global and stored lower case.
+- [x] Postgres: forced RLS on every tenant table. `users` and `sessions`
+      also accept a transaction-local `app.auth_lookup` flag, set only
+      around the login and session lookups.
 
-**Routes kept:** `/api/setup/status`, `/api/setup`, `/api/auth/login`,
-`/api/auth/logout`, `/api/auth/me`, users, roles and permissions groups.
-**Removed:** `/api/auth/refresh`. **New:** `/api/auth/switch-shop`,
-`/api/platform`.
+**Auth:**
+- [x] Opaque sessions: 32 random bytes, SHA-256 hash stored, 12 h idle /
+      30 days absolute, activity refreshed at most once a minute.
+- [x] `balce_session` cookie (HttpOnly, SameSite=Lax, Path=/, Secure in
+      cloud or over HTTPS). Desktop sends a Bearer token, which the login
+      body returns only when `X-Balce-Client: desktop` is sent.
+- [x] Unknown emails spend the same bcrypt time as wrong passwords and get
+      the same message; 5 failures per IP+email per minute, then 429.
+      Failed attempts are recorded even though the response is a 401.
+- [x] Sessions end on logout, expiry, deactivation, role change and
+      password change. The session that changed its own password stays.
+- [x] Origin allowlist on non-GET requests (same-origin allowed); helmet.
+- [x] Setup only when no company exists, and desktop only (cloud returns
+      404). `cmd/admin create-company` creates cloud companies with a
+      one-time owner password that must be changed at first sign-in.
 
-- [ ] Sessions: 32 random bytes; only the SHA-256 hash is stored; 12 h
-      idle and 30 days absolute; `last_seen_at` bumped at most once a
-      minute.
-- [ ] Cookie `balce_session` (`HttpOnly`, `SameSite=Lax`, `Path=/`,
-      `Secure` over HTTPS); Bearer accepted for Tauri.
-- [ ] All of a user's sessions revoked on password change, disable or role
-      change.
-- [ ] Origin allowlist on non-GET requests; Fiber `limiter` on login (IP +
-      email); `helmet`.
-- [ ] Setup is allowed only when no company exists (the desktop first run).
-      Cloud companies are created with `cmd/admin create-company`; there's
-      no public signup.
-- [ ] Setup creates company + first shop + owner role + owner user +
-      settings in one transaction.
-- [ ] Login-by-email and session-by-token lookups run before the tenant is
-      known. The RLS policy therefore reads `app.company_id` with
-      `missing_ok` (an unset value matches no rows, so it still fails
-      closed), and only the auth repository sets a narrow
-      `app.auth_lookup` flag that the `users` and `sessions` policies
-      accept.
-- [ ] RLS tests connect as `balce_app`, because a superuser bypasses RLS
-      even with `FORCE`.
-- [ ] Carried over from Phase 0: a test that the pre-migration SQLite copy
-      is created when migration 2 is pending.
-- [ ] Frontend: delete the refresh logic, add `usePlatform` (with
-      `isTauri()` moved in) and the runtime API base; the login, setup,
-      users and roles pages work; UUID ids replace numeric ids in the
-      types.
+**Users and roles:**
+- [x] Only owners manage owners; the last active owner can't be demoted
+      or deactivated; nobody can deactivate themselves; a non-owner can't
+      grant permissions they don't hold; the owner role can't be edited
+      or deleted; roles in use can't be deleted; delete deactivates.
+- [x] Lists are paginated and run at most 3 queries.
 
-**Edge-case tests:**
-- [ ] Setup a second time → 409.
-- [ ] Wrong password and unknown email give the same message and similar
-      timing (no user enumeration).
-- [ ] The 6th failed login within a minute → 429.
-- [ ] Disabling a user makes their live session 401 on the next request.
-- [ ] An expired session (idle or absolute) → 401 and the row is removed.
-- [ ] The raw token is never in the database.
-- [ ] Cookie flags asserted; Bearer path works.
-- [ ] POST with a foreign `Origin` → 403.
-- [ ] Two companies can both have a role called "Manager"; the same company
-      twice → 409.
-- [ ] The last owner can't be deleted or demoted.
-- [ ] A role from company B can't be assigned to a user in company A.
-- [ ] A duplicate email anywhere in the platform → 409.
-- [ ] A user without `users.edit` can't grant themselves permissions.
-- [ ] Switching to a shop not in `user_shops` → 403.
-- [ ] **Two-company leak test:** company A's token on every endpoint never
-      returns company B data (both engines, and RLS alone on Postgres by
-      calling a repository without the explicit filter).
+**Frontend:**
+- [x] API address resolved at runtime (Tauri / Vercel / LAN origin).
+- [x] Refresh flow removed; a 401 clears the session.
+- [x] **Route guards now actually run.** They were in `frontend/middleware/`,
+      which Nuxt 4 never loads, so neither guard had ever been active.
+- [x] Permissions come with the session; the eleven per-page refetches
+      are gone.
+- [x] Users and roles pages on the new API; deactivate wording; owner
+      badges; the header uses the shared user and `logout()`.
+- [x] Phone layout: sidebar hidden below 768 px, tables scroll in their
+      card.
+- [x] `app/utils/portedRoutes.ts` hides pages that aren't rebuilt yet.
 
-**Verification performed:** _pending_
+**Edge-case tests** (SQLite, and Postgres as a non-superuser so RLS applies):
+- [x] Setup twice → 409; cloud setup → 404; setup owner gets all 40
+      permissions and the Main Shop.
+- [x] Wrong password and unknown email: same message, and similar timing.
+- [x] 6th failed login in a minute → 429; failures survive the rollback.
+- [x] Cookie flags; the cookie works for `/me`; only the hash is stored.
+- [x] No token or a forged token → 401; logout, idle and absolute expiry
+      → 401 and the row is removed; a deactivated user's session → 401
+      and they can't sign in.
+- [x] A foreign `Origin` → 403; the allowed origin works.
+- [x] Switching into another company's shop or an unassigned shop → 403.
+- [x] Invalid body → 400 with field errors; an email used by another
+      company → 409; another company's role or shop → 404 with nothing
+      written.
+- [x] A manager can't create an owner, demote the owner, grant themselves
+      `settings:edit` or widen their own role; the last owner can't be
+      demoted; the owner can't deactivate themselves.
+- [x] A role change ends the user's sessions.
+- [x] A password change keeps its own session, ends the others, and the
+      old password stops working.
+- [x] 30 users: page of 25 in ≤ 3 queries, shop ids attached, offset past
+      the end is empty, search is case-insensitive.
+- [x] Two-company isolation: every list is free of the other company's
+      data; 12 cross-tenant reads and writes return 404 and change
+      nothing; with RLS, unfiltered queries see nothing without a tenant
+      and one company's rows with it, and a cross-company insert is
+      rejected.
+- [x] A foreign SQLite file (tables but no migration history) is refused
+      and left untouched.
+- [x] The pre-migration copy is made when migrations are pending.
+
+**Verification performed (2026-09-29):**
+- `go build ./... && go vet ./...` clean; `TEST_DATABASE_URL=… go test
+  -count=1 ./...` → every package passes, every subtest on both engines
+  (confirmed with `-v`).
+- Mutation check: removing the company filter from the user lookup made
+  the isolation test fail on SQLite (200 instead of 404). File restored.
+- `cmd/admin create-company` smoke-tested: creates the company and
+  one-time password; rejects empty or invalid input with field messages.
+- `pnpm build` and `pnpm generate` pass.
+- Browser pane against the new backend on a scratch SQLite file:
+  first-run setup → sign-in lands on Users → create role → assign a
+  permission (200) → create cashier → full reload keeps the session →
+  `/pos` redirects to `/users` → sign-out → `/users` redirects to sign-in.
+  Checked light, dark and 375 px.
+- Bugs found and fixed while checking: route guards never loaded; header
+  logout posted to the frontend's own origin; stale role counts after
+  saving; the layout overflowed on phones; the badge text wrapped.
+
+**Known gaps (expected until later phases):**
+- `/api/license/status`, `/api/license/hardware-id` (Phase 7) and
+  `/api/notifications/count` (Phase 4) return 404. The UI handles them
+  quietly.
+- There's no shop picker in the user form yet; new users get the
+  creator's current shop. Shops UI is Phase 4.
+- `app/components/AppSidebar.vue` is unused; it gets deleted in Phase 9.
+
+**Manual follow-up:**
+- On the owner's Mac, `~/Library/Application Support/com.balceinv.app/balce.db`
+  (the old desktop app's database) has an extra empty-looking
+  `schema_migrations` table, left by an early smoke run before the
+  legacy-database guard existed. The old app ignores it. If you want it
+  gone, back up that file and run `DROP TABLE schema_migrations;` on it.
+  The revamped app now uses `balce.sqlite`, so it never touches that file.
 
 ---
 
