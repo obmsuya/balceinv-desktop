@@ -369,44 +369,86 @@ command and legacy-database guard). Frontend: balceinv PR #1.
 
 ## Phase 2: company settings, branding, currency, storage
 
-**Tables:** `settings` (company-level: tax rate in basis points,
-receipt toggles, alert settings, EFD, desktop printer fields), plus
-company branding and currency columns and per-shop receipt prefix and
-counter.
+Backend: balceinv-api PR #10. Frontend: balceinv PR #2.
 
-- [ ] `internal/common/storage`: `Put`/`Get`/`Delete`, with a Garage (S3)
-      implementation for cloud and a local-directory one for desktop.
-- [ ] Logo upload: ≤ 1 MB, content type sniffed (png/jpeg/webp) rather
-      than trusted from the extension; the object key is stored, never
-      base64 in rows.
-- [ ] `primary_color` validated as `#RRGGBB`.
-- [ ] The EFD API key is write-only: responses carry `efd_api_key_set`
-      only.
-- [ ] Currency code and decimals chosen at setup (TZS default 0 decimals);
-      changing them after the first sale → 409 (the check goes live in
-      Phase 5).
-- [ ] Frontend theme: load the brand colour into `--brand`; light
-      `--primary` = the brand; dark `--primary` = the brand mixed lighter
-      with `color-mix`; the foreground is black or white by luminance;
-      ring, sidebar and chart-1 follow the brand. The last brand is cached
-      locally so reloads don't flash the default green.
-- [ ] Settings → Branding: colour picker with presets, a live preview of
-      both themes, and a contrast warning below WCAG AA; logo upload.
-- [ ] Icons: lucide only, one size scale (16 px inline, 20 px nav), the
-      company logo in the sidebar header, the app logo and favicon from
-      `public/logo`.
-- [ ] `formatMoney` in `useSettings` replaces all 25 hardcoded `TZS`
-      formatters. `grep -rn "TZS" app` returns nothing.
+- [x] `settings` table per company (tax in basis points, receipt, alert,
+      EFD and desktop printer fields), created with every company; RLS on
+      Postgres.
+- [x] `internal/common/storage`: one `Store` interface; a local-folder
+      store for desktop (media beside the database) and an S3 store for
+      Garage, signed with SigV4 using only the standard library. Keys must
+      match `^[a-z0-9][a-z0-9/_.-]*$` with no `..` or empty segments.
+      Cloud config requires every `S3_*` value.
+- [x] `GET/PUT /api/settings` with partial updates; `#RRGGBB` colours,
+      tax 0–100, upper-case currency, 0 or 2 decimals, IANA timezone,
+      `https://` EFD endpoint, valid notification email, 58/80 mm paper.
+- [x] EFD API key is write-only (`efd_api_key_set`); an empty value
+      clears it.
+- [x] Logo: ≤ 1 MB, type detected from the bytes (PNG/JPEG/WebP), stored
+      under `logos/<company>/<random>.<ext>`, served publicly and immutably
+      at `/api/branding/logo/<company>/<file>`.
+- [x] `/me` and login return `branding` (logo, colour, currency, decimals,
+      timezone, locale), so cashiers without `settings:view` still get
+      the brand and currency.
+- [x] Frontend theme: `--brand` drives primary, ring, chart and sidebar
+      accents; dark mode lightens it until it reaches 3:1 on the dark
+      page; text on the brand is black or white by contrast; the last
+      brand is cached and applied before the first render.
+- [x] Branding tab: picker, hex field, 13 presets, live light and dark
+      previews, a warning below 3:1 against the page, logo upload.
+- [x] Header shows the company logo and name; lucide icons for the theme
+      toggle.
+- [x] `formatMoney` replaces nine local formatters (eight TZS, one USD on
+      the dashboard) and the "(TZS)" labels.
+- [x] Settings page on the new API. Removed because they saved or did
+      nothing: the fake "Test EFD connection" (it always said unreachable)
+      and the "Change Counter" switch. The serial printer card and Updates
+      tab show only in the desktop app. Backup tab returns in Phase 7.
+- [ ] Currency locked after the first sale: the check lands with sales in
+      Phase 5.
 
-**Edge-case tests:**
-- [ ] Bad hex, 3-digit hex or a missing `#` → 400.
-- [ ] Company B can't read or change company A's settings or logo.
-- [ ] The EFD key never appears in any response.
-- [ ] An oversized logo or a fake `.png` → 400.
-- [ ] Brand colour change → both themes update without reload (preview
-      check, light + dark).
+**Edge-case tests** (SQLite and Postgres as a non-superuser):
+- [x] Defaults; a settings read runs at most 2 queries.
+- [x] A partial update changes only the fields sent.
+- [x] 12 rejected inputs: `#fff`, `1d4ed8`, `#12345G`, tax 101 and −1,
+      `kes`, 3 decimals, an unknown timezone, an `http://` EFD endpoint,
+      a bad email, 70 mm paper, an empty business name.
+- [x] `/me` branding follows the settings; another company's settings are
+      unchanged; `settings` is included in the RLS check.
+- [x] A cashier gets 403 on settings but still receives the brand in
+      `/me`.
+- [x] The EFD key never appears in any response; another update keeps it;
+      an empty value clears it.
+- [x] Logo: missing file 400; text named `.png` 400; 1 MB + 1 → 413;
+      cashier 403; a valid PNG is stored and served byte-for-byte with
+      `image/png` and an immutable cache header; traversal, a bad company
+      id, an unknown file and `.svg` → 404.
+- [x] Both stores round-trip on a real folder and a real Garage; unsafe
+      keys are rejected; a wrong S3 secret is refused.
+- [x] Config: cloud without `S3_ENDPOINT` fails; a partial S3 config lists
+      every missing value; desktop media defaults beside the database.
 
-**Verification performed:** _pending_
+**Verification performed (2026-09-29):**
+- `go build ./... && go vet ./...` clean; `TEST_DATABASE_URL=…
+  TEST_S3_ENDPOINT=… go test -count=1 ./...` → every package passes;
+  settings subtests confirmed on both engines.
+- `pnpm build` and `pnpm generate` pass.
+- Browser pane against the new backend (desktop mode, local media): the
+  blue preset applies live (`--primary #2563eb`, white text, dark
+  `#5182ef`) and survives a reload; the slate preset gets a visible dark
+  variant; pale yellow shows the 1.2:1 warning; an invalid hex disables
+  saving; a PNG logo uploads and loads in the header cross-origin; KES
+  with 2 decimals saves and `/me` follows; the EFD key shows as saved and
+  is absent from the response; the Hardware tab shows only receipt
+  options in a browser; light, dark and 375 px (the tab row now scrolls).
+- Found and fixed while checking: the first contrast warning could never
+  fire (auto-picked text is always ≥ 4.58:1), so it now compares the brand
+  against the page background; near-black brands were invisible in dark
+  mode; the settings tab row was clipped on phones; the slate swatch
+  vanished on the dark background.
+
+**For the deploy round:** `/opt/balce/.env.prod` needs `S3_ENDPOINT=http://garage:3900`
+and `S3_BUCKET=balce-media`; the access key and secret are already there.
 
 ---
 
@@ -588,7 +630,10 @@ succeed.
       `golang-jwt` are deleted.
 - [ ] Unused frontend dependencies removed after a grep proves them unused
       (`@libsql/client`, `drizzle-orm`, `drizzle.config.ts`, `pg`,
-      `puppeteer-core`, `@sparticuz/chromium`, `jsonwebtoken`, `bcryptjs`).
+      `puppeteer-core`, `@sparticuz/chromium`, `jsonwebtoken`, `bcryptjs`,
+      `@iconify/vue` once `ModeToggle.vue` is gone).
+- [ ] Dead components deleted: `AppSidebar.vue` and `ModeToggle.vue`
+      (neither is used).
 - [ ] The "hidden until ported" nav list is deleted.
 - [ ] `CLAUDE.md` stack section updated (database/sql + pgx/modernc, no
       GORM, the new layout).
