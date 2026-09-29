@@ -1324,6 +1324,187 @@ exists.**
 - **Delete the stale workflow:** delete `backend/.github/workflows/release.yml`
   in balceinv-api if you agree.
 
+## Phases 10–15: the overnight build (2026-09-30)
+
+The owner approved the plan and asked for everything to be built overnight:
+- optional suppliers, customers with credit (madeni), and orders;
+- simple-first accounting that can be audited;
+- branded Excel and PDF;
+- a support email from the footer;
+- the importer for the old app's data.
+
+**Everything new is off by default** and turned on per business in
+Settings → Features.
+
+Backend: balceinv-api #49–#58. Frontend: balceinv #23–#30.
+Desktop: #21 (build check), #22 (support mail secret).
+
+### Foundation: feature switches (#49, balceinv #23)
+- [x] `company_features` has these switches, all off by default:
+      - `suppliers_enabled`, `purchase_orders_enabled`;
+      - `customers_enabled`, `credit_sales_enabled`, `customer_orders_enabled`;
+      - `accounting_mode` (`off|simple|full`);
+      - `vat_registered` with the VRN.
+      They obey these rules: credit and orders need customers, purchase
+      orders need suppliers, and VAT needs a VRN.
+- [x] `/api/features`; `/me` carries the switches. New permissions:
+      suppliers, purchases, customers, orders and accounting (60 in total).
+- [x] Settings → Features / Vipengele tab. Menu items and routes
+      appear only when switched on.
+
+### Phase 10: branded documents (#52, #55, #56, balceinv #26)
+- [x] `internal/documents` has two builders:
+      - Excel with excelize: brand-colour header row, real `SUM` totals,
+        frozen panes, A4 print setup and a filters sheet;
+      - PDF with maroto v2 and the Go fonts: header and footer on every
+        page, repeated table headers, "Page x of y".
+- [x] Every report downloads as Excel or PDF from the server, in English
+      or Kiswahili.
+- [x] An A4 invoice or receipt for any sale, showing the customer, the
+      order number and the amount on credit.
+
+### Phase 11: suppliers and purchasing (#54, balceinv #28)
+- [x] Suppliers are optional, and so is the supplier on "Stock arrived":
+      stock with no supplier must be paid in full.
+- [x] Cost updates by moving weighted average across open shops.
+- [x] Supplier payments, returns to a supplier, balances, a statement
+      with running balance, and aging.
+- [x] Optional purchase orders, which can be received in parts.
+- [x] "Stock arrived" is also on the Stock page; products can have a
+      usual supplier.
+
+### Phase 12: customers, credit and orders (#53, balceinv #27)
+- [x] Customers are optional at the till (search or quick add).
+- [x] "Lipa baadaye" (pay later) is checked against the customer's credit
+      limit.
+- [x] Debt payments with voids, a "who owes" list with aging, and a
+      statement.
+- [x] A WhatsApp reminder from the customer's page.
+- [x] Customer orders:
+      - an order and its deposit set the stock aside;
+      - marking it ready, then collecting it, makes exactly one sale
+        without taking the stock twice;
+      - cancelling refunds the deposit.
+
+### Phase 13–14: accounting and its reports (#57, #58, balceinv #30)
+- [x] **Books:**
+      - double-entry journal with gapless numbers;
+      - database triggers refuse UPDATE and DELETE;
+      - corrections only by reversal;
+      - months can be closed.
+- [x] **Automatic postings,** in the same transaction as the event:
+      - sales, including credit, and the cost of goods sold;
+      - stock adjustments and transfers;
+      - purchases, supplier payments and returns;
+      - debt payments;
+      - order deposits and collections;
+      - opening balances.
+- [x] **Money page (Fedha) in plain words.** Buttons for money out,
+      owner put in or took out, move money and other money in. It shows
+      where the money is, what customers owe, and what is owed to
+      suppliers.
+- [x] **Start wizard.** "Start from my existing records" rebuilds the
+      books from existing data. "Start from today" starts from the
+      stock on hand now.
+- [x] **Full mode** adds a chart of accounts, entries, manual entries,
+      month closing, trial balance, balance sheet, account statement or
+      cash book, VAT by month with the due date, and a books check.
+      Reports export to Excel and PDF.
+
+### Phase 15a: support email (#50, balceinv #24)
+- [x] Footer "Msaada" link and the account menu open a form: topic,
+      message, email **or** phone (at least one), a screenshot, and
+      optional technical details.
+- [x] **Sending:**
+      - messages queue and are sent from `obmsuya@yahoo.com` to
+        `obmsuya@gmail.com` as a formatted HTML email, with Reply-To set
+        to the customer, and tap-to-call and WhatsApp links;
+      - retries with backoff; limited to 5 an hour per business;
+      - the destination address is never shown in the app.
+
+### Phase 15b: bringing over the old app's data (#51, balceinv #25)
+- [x] Setup offers "Hamisha data zangu za zamani" when the old `balce.db`
+      exists. It shows a preview first, then imports everything in one
+      transaction:
+      - business, users (old passwords keep working), roles;
+      - products and stock;
+      - suppliers and discounts;
+      - sales history (receipts prefixed `OLD-`).
+- [x] The self-check compares counts, sales value and stock value on both
+      sides; any difference rolls everything back. The old file is opened
+      read-only.
+
+**Verification performed (2026-09-30):**
+- **Tests:**
+  - Each track: `gofmt`, `go vet` and `go test ./...` on SQLite and
+    Postgres; locales check and `pnpm build`.
+  - After every merge, the lead reran the full suite.
+  - Final state: 34 packages pass on both engines, and the frontend
+    builds with 2,381 keys in each language.
+- **Build check on GitHub:** the Windows, Intel Mac, Apple Silicon Mac
+  and Linux installers all built.
+- **Browser, in Kiswahili, against a fresh local install:**
+  - **Old-data import:** tried on a *copy* of the owner's real old
+    `balce.db`. The preview was right, the self-check matched, and the
+    original file's SHA-256 was unchanged.
+  - **Features tab:** saved, and the menu followed.
+  - **Suppliers:** a supplier added. A purchase on credit updated the
+    weighted cost to (12 × 6,200 + 10 × 4,000) / 22 = 5,200.
+  - **Credit sale at the till:** TSh 6,500 cash + TSh 10,000 pay later.
+    The debt showed and dropped by a TSh 4,000 payment. Over the limit,
+    over-payment and credit without a customer were all refused with
+    clear messages.
+  - **Order:** reserve (stock 25 → 20), mark ready, collect as one sale
+    with no second stock deduction.
+  - **Support form:** said "not set up yet" locally, because no SMTP
+    password is set here.
+  - **Documents:** report Excel and PDF (3 pages) and the A4 invoice
+    rendered and looked right.
+  - **Books from existing records**, all checked by hand:
+    - money in 28,500, cash 39,500, mobile money 9,000, customers owe
+      6,000, owed to suppliers 40,000;
+    - profit 6,700 (sales 34,500 − cost of goods 27,800);
+    - an expense and its reversal moved profit and cash and back exactly;
+    - a second reversal was refused;
+    - the trial balance balanced;
+    - ledger sales equal the sales report;
+    - the profit & loss PDF is correct.
+  - **Layout at 375 px:** no sideways scroll on the new pages; the tab
+    rows scroll.
+- **Fixed during the pass:**
+  - the invoice lacked the customer and the credit line (#55, #56);
+  - the English "Opening balances" note (#58);
+  - the hidden English "Close" label on dialogs (balceinv #29).
+
+**Known limits:**
+- "Start from my existing records" values the rebuilt opening stock and
+  stock adjustments at **today's** cost. If costs changed, the books
+  check shows the gap: TSh 12,000 in the test, after a purchase moved the
+  oil's cost. "Start from today" has no such gap.
+- The balance sheet and trial balance are company-wide only.
+- Not yet possible:
+  - cancelling a return to a supplier, or editing a purchase order;
+  - add-ons on customer orders, or partial deposit refunds;
+  - a customer wallet or credit balance.
+- The app version shows only in the desktop app (the support details are
+  empty in a browser).
+
+**Before tagging `v2.0.0`** (the version is bumped in this change):
+- Add the GitHub secret **`SUPPORT_SMTP_PASSWORD`** (a Yahoo *app
+  password* for obmsuya@yahoo.com). Without it, support messages wait in
+  the app.
+- Download the Windows installer from the latest "Build check" run, and
+  on a Windows PC:
+  - set up a business, sell, and print;
+  - turn on credit and sell on credit;
+  - send a support message;
+  - end the app in Task Manager and restart it.
+- On a PC with the old app installed, update and use "Hamisha data zangu
+  za zamani". Sign in with the old password and check the products and
+  stock.
+- Then push the tag. The release workflow builds, signs and publishes
+  `latest.json`, and installed apps update themselves.
+
 ## Manual follow-up required
 _Collected from the phases above as they complete._
 
