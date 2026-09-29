@@ -79,9 +79,25 @@ Cloudflare Origin Certificate) and **Woodpecker CI**. Hardware: Ubuntu
       - Seen from the Mac, only 22, 80 and 443 are open; 5432, 6379,
         8000, 8001 and 3900 stay closed.
       - Nothing is left in `/var/run/reboot-required`.
-- [ ] Ubuntu 25.04 has had no security updates since January 2026.
-      Upgrade to 26.04 LTS later, **after a provider snapshot**, in a
-      maintenance window (runbook to be written).
+- [x] Upgraded Ubuntu 25.04 → **26.04.1 LTS** (2026-09-29, 17:53–18:08
+      UTC), without a provider snapshot by the owner's decision. Taken first,
+      in `/root/pre-upgrade-20260929-1751/` (root only, `600`):
+      - a `backup.sh` dump of Balce;
+      - a `pg_dumpall` of faltasi;
+      - a tarball of `/etc`;
+      - the package list.
+      `do-release-upgrade` ran non-interactively inside `tmux` and went
+      straight from 25.04 to 26.04 (exit 0). Old config files were kept.
+      - SSH refused connections for about 5 minutes while the upgrade
+        moved it to socket activation (`ssh.socket`). faltasi stayed up
+        the whole time.
+      - The upgrader disabled the Docker repo. It is now
+        `/etc/apt/sources.list.d/docker.sources` on `resolute`, and the
+        old `docker.list` is saved in the pre-upgrade folder. Docker went
+        29.2.1 → 29.8.1 and Compose → 5.5.1.
+      - Rebooted onto kernel 7.0.0-34; 6.14.0-37 stays as a fallback.
+        SSH came back in about 40 s, and every container restarted on
+        its own.
 
 ### S3: firewall
 - [x] ufw: default deny incoming, `limit 22/tcp`, allow 80/tcp and 443/tcp.
@@ -155,6 +171,22 @@ through Cloudflare.
   Postgres with `ALTER ROLE … PASSWORD`.
 - Never commit `.env.prod`, never paste it into chat, and keep a copy in a
   password manager.
+
+**Verification performed (OS upgrade, 2026-09-29):**
+- `lsb_release -ds` → Ubuntu 26.04.1 LTS; `uname -r` → 7.0.0-34-generic.
+- `docker ps`: all 8 containers up; Postgres, Garage and both Woodpecker
+  containers healthy. `systemctl --failed` is empty and nothing is left in
+  `/var/run/reboot-required`.
+- faltasi `/health` → 200, both locally and through Cloudflare.
+- `backup.sh` → new dump; `restore-drill.sh` → "row counts match".
+- `sshd -T`: password login is still on (the owner's decision) and so is
+  root login; ufw is unchanged (`limit 22`, allow 80 and 443).
+- Swap 1 GB with `vm.swappiness` 10, fwupd still masked, the backup cron
+  in `/etc/cron.d/balce-backup` unchanged, and unattended upgrades still
+  security-only with no automatic reboot.
+- Port scan from the Mac: 22, 80 and 443 open; 1022 (the upgrader's
+  spare SSH), 3900, 3901, 3903, 5432, 6379, 8000 and 8001 closed.
+- The pre-upgrade folder can be deleted after a week of normal running.
 
 **Verification performed (Track S, 2026-09-29):**
 - `free -m`: available 447 MB → 974 MB after fwupd and swap (1,072 MB after
