@@ -67,8 +67,18 @@ Cloudflare Origin Certificate) and **Woodpecker CI**. Hardware: Ubuntu
       container came back and faltasi answered 200 locally and through
       Cloudflare. Unattended upgrades on, security channel only, no
       automatic reboot.
-- [ ] Reboot pending for kernels 6.14.0-35 to -37 and libc (they were
-      installed before this round). Ask the owner before rebooting.
+- [x] Rebooted with the owner's go-ahead (2026-09-29 15:37 UTC, after 318
+      days up): 6.14.0-27 → 6.14.0-37 with the new libc; the -27 kernel
+      stays as a fallback. A fresh `backup.sh` dump was taken first.
+      SSH came back in about 30 s, and every container restarted on its own.
+      Checked after the reboot:
+      - Postgres and Garage report healthy; faltasi answers 200 locally
+        and through Cloudflare.
+      - ufw rules, swap (1 GB, swappiness 10), fwupd off and the backup
+        cron are unchanged.
+      - Seen from the Mac, only 22, 80 and 443 are open; 5432, 6379,
+        8000, 8001 and 3900 stay closed.
+      - Nothing is left in `/var/run/reboot-required`.
 - [ ] Ubuntu 25.04 has had no security updates since January 2026.
       Upgrade to 26.04 LTS later, **after a provider snapshot**, in a
       maintenance window (runbook to be written).
