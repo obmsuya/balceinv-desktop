@@ -41,7 +41,10 @@ pub fn run() {
         )
         .setup(|app| {
             let shell = app.shell();
-            let mut sidecar_command = shell.sidecar("backend").expect("backend sidecar not found");
+            let mut sidecar_command = shell
+                .sidecar("backend")
+                .expect("backend sidecar not found")
+                .env("BALCE_EXIT_WITH_PARENT", "1");
             if let Ok(resource_directory) = app.path().resource_dir() {
                 let static_directory = resource_directory.join("frontend");
                 if static_directory.join("index.html").exists() {
