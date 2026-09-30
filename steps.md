@@ -1848,6 +1848,52 @@ before the pattern is copied.
 ### Next steps
 - Step 4: Money as a recording page with one transactions table.
 
+## Phase 23: accounting reports, step 4 — Money as a recording page (2026-09-30)
+
+### Findings being fixed
+- Money repeated what Reports now does. It had profit, own/owe and books
+  report tabs, plus stat cards, a VAT card and balance tiles
+  (`frontend/app/pages/money/index.vue`, `frontend/app/components/money/*Panel.vue`).
+- Records were a card list, not a data table
+  (`frontend/app/components/money/EntryList.vue`).
+
+### Implementation status
+- [x] One transactions table: Date, No., Details, Recorded by, Money in, Money
+      out (`frontend/app/components/money/EntriesTable.vue`). Money in and out
+      come from the money-account lines of each entry. Entries that move no
+      money say so.
+- [x] The same filters as Reports: Period select, dates and shop. Full
+      accounting adds "Show: Money records / Every entry".
+- [x] Header actions:
+  - "Money out";
+  - "Record other" (other money in, move money, owner in or out, manual
+    entry);
+  - "More" (Reports, Books check, Chart of accounts, Close month).
+- [x] Balances shown as one line for the end date.
+- [x] The books check is a dialog, with a warning banner only when debits and
+      credits differ or the books disagree with the sales report
+      (`frontend/app/components/money/BooksCheckDialog.vue`).
+- [x] Removed the profit, own/owe and books-reports panels and the export
+      buttons. Removed the report fetchers and exports from `useMoney`, which
+      Reports now covers.
+- [x] PR: balceinv #39.
+
+### Verification performed
+- `pnpm generate` and `node scripts/locales.check.ts` pass.
+- Local cloud preview (full books, VAT, supplier, credit customer, Kiswahili):
+  - the table loaded;
+  - Record other → Move money opened its form;
+  - the books check showed every check passing (sales 96,000 = 96,000; stock
+    1,766,150 = 1,766,150);
+  - the chart of accounts opened in a dialog;
+  - Every entry listed all 20 entries;
+  - opening an expense row showed balanced debit and credit lines (64,900).
+- At 375 px neither Money nor Reports scrolls sideways; on phones the date
+  sits under the details.
+
+### Next steps
+- Tour plan steps 2–5.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
