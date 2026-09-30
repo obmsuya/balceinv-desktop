@@ -1607,15 +1607,15 @@ public web port of its own; visitors reach it only through Cloudflare.
       styling in light and dark, English and Kiswahili, skip on every step,
       "Show the tour" in the account menu. Tours: Welcome (menu, header, the
       three first setup steps), Settings, Products, Point of Sale.
-- [ ] **Step 2:** Users and Roles (add a cashier, what roles allow), Shops
+- [x] **Step 2:** Users and Roles (add a cashier, what roles allow), Shops
       (add a branch, receipt prefix), Stock (change stock, send stock).
-- [ ] **Step 3:** the optional features, each shown the first time its page
+- [x] **Step 3:** the optional features, each shown the first time its page
       opens after it is switched on: Customers and credit (madeni), Orders,
       Suppliers and purchases, Money (simple and full books).
-- [ ] **Step 4:** Reports and Dashboard, Discounts, Sales history and
+- [x] **Step 4:** Reports and Dashboard, Discounts, Sales history and
       refunds; a "Getting started" checklist on the dashboard (business
       details, logo, first product, first cashier, first sale).
-- [ ] **Step 5:** remember seen tours on the server so a new device does not
+- [x] **Step 5:** remember seen tours on the server so a new device does not
       repeat them (today: per user on this device).
 
 ### Auto-deploy to the cloud
@@ -1893,6 +1893,80 @@ before the pattern is copied.
 
 ### Next steps
 - Tour plan steps 2–5.
+
+## Phase 24: tour steps 2–5, support email, team handbook (2026-09-30)
+
+### Findings being fixed
+- Only the welcome, Settings, Products and Point of Sale pages had a tour
+  (`frontend/app/composables/useTour.ts`). Seen tours lived only in the
+  browser, so a new device repeated them.
+- The dashboard did not tell a new owner what was left to set up.
+- `SUPPORT_SMTP_PASSWORD` was missing on the server and in GitHub, so support
+  messages waited in the database and desktop builds could not send email.
+- The team kept asking the same questions (subscriptions, the sales tool,
+  where expenses go) with no guide to point to.
+
+### Implementation status
+- [x] Tours for Users, Roles, Shops, Stock, Customers, Orders, Suppliers,
+      Money, Reports, Dashboard, Discounts and Sales, in English and Kiswahili.
+      Each runs the first time its page opens. The Money tour explains where
+      expenses are recorded.
+- [x] "Getting started" checklist on the dashboard, for owners only
+      (`frontend/app/components/GettingStartedCard.vue`). It covers business
+      phone and address, logo, first product, a cashier and the first sale.
+      Items tick themselves off, and the card can be hidden.
+- [x] Seen tours are remembered on the server:
+  - migration 000053 adds `users.seen_tours`;
+  - `PUT /api/auth/tours` records a tour;
+  - `/api/auth/me` returns `seen_tours`;
+  - `/api/dashboard` returns `getting_started`.
+- [x] `SUPPORT_SMTP_PASSWORD` added to `/opt/balce/.env.prod` (the API was
+      restarted and the container has the variable) and as a GitHub Actions
+      secret for desktop release builds. It was never printed or committed.
+- [x] Team handbook (`docs/team/README.md`): the guide index and the
+      documentation plan. New guides: `docs/team/subscriptions.md` and
+      `docs/team/recording-expenses.md`.
+- [x] PRs: balceinv-api #66, balceinv #40.
+
+### Verification performed
+- `go vet ./...` and `go test ./...` pass on SQLite and Postgres, including
+  new tests:
+  - tours are recorded once per user and company, bad names are refused, and
+    sign-in is required;
+  - the checklist follows setup and does not leak between companies.
+- `pnpm generate` and the locales check pass (2439 keys in each language).
+- Local cloud preview (Kiswahili):
+  - the welcome tour, then the dashboard tour, ran;
+  - the checklist showed 3 of 5;
+  - `/api/auth/me` returned `seen_tours` [welcome, dashboard];
+  - with local storage cleared, the dashboard tour did not repeat;
+  - all 11 other page tours ran;
+  - steps with no target on screen were skipped (Send stock with one shop;
+    Roles in the menu while the drawer is closed).
+- https://pos.faltasi.com/health returned 200 after the API restart.
+
+### Subscription check (for the team's questions)
+POS_MASTER and wapangaji were read on 2026-09-30.
+- Every endpoint and field POS_MASTER uses still exists and has the same
+  shape.
+- A licence made with POS_MASTER is the same record as one the customer pays
+  for inside the POS.
+- Timing difference: a device still on the free trial does not pick up a
+  POS_MASTER licence until the trial and grace days end. The startup sync
+  sends the key `trial` (`backend/license/license.go:334`), and the status
+  check only asks the server when the POS is locked
+  (`backend/internal/licensing/handler.go:84`).
+- Trial is 14 days and grace is 5 days, counted from expiry
+  (`backend/license/license.go:27,57`).
+
+### Manual follow-up required
+- Send a test message from Help → Contact the Balce team on pos.faltasi.com
+  and confirm it arrives at the support inbox.
+- Wapangaji payment security, which lives in the wapangaji repository:
+  - the Balce payment callback accepts unauthenticated posts
+    (`apps/payments/api/balce_views.py:189`);
+  - partner accounts can register themselves and record payments.
+  Decide how to lock both down.
 
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
