@@ -1505,6 +1505,169 @@ Desktop: #21 (build check), #22 (support mail secret).
 - Then push the tag. The release workflow builds, signs and publishes
   `latest.json`, and installed apps update themselves.
 
+## Phase 16: cloud deploy behind Cloudflare Tunnel (2026-09-30)
+
+The cloud app and its API run at **https://api-pos.faltasi.com** (one
+origin: the Go server serves the web app and `/api`). The server has no
+public web port of its own; visitors reach it only through Cloudflare.
+
+### Findings fixed
+- Behind the tunnel every request reached the server from the tunnel, so
+  `c.IP()` was the same for everyone and one person's wrong passwords
+  locked all visitors out of signing in
+  (`backend/internal/server/server.go`, `backend/internal/config/config.go`).
+- The app connected to Postgres as the table owner. Migrations now run as
+  `balce_owner` through `MIGRATION_DATABASE_URL`; the app serves as
+  `balce_app` (no BYPASSRLS) (`backend/cmd/server/main.go`).
+- The cloud login page offered "Set up your business", which the cloud
+  refuses; it now shows only on the desktop (`frontend/app/pages/login.vue`).
+
+### Implementation status
+- [x] Owner: domain in Cloudflare, tunnel `balce-server` created, route
+      `api-pos.faltasi.com` → `http://localhost:8080`.
+- [x] `cloudflared` 2026.9.3 from Cloudflare's apt repository, installed as
+      a systemd service with the dashboard token; 4 connections registered.
+- [x] `PROXY_HEADER=CF-Connecting-IP`, `TRUSTED_PROXIES` = the gateway of the
+      `balce_edge` network (the only address the tunnel reaches the API from).
+- [x] `api` service in `deploy/docker-compose.prod.yml`: published on
+      `127.0.0.1:8080` only, image carries `balce-api`, `balce-admin` and the
+      built web app, `balce_edge` gives it outbound access (support email,
+      EFD), logs in the `api_logs` volume, 192 MiB limit.
+- [x] `deploy/deploy.sh`: checks `ALLOWED_ORIGINS`, builds the web app and
+      both binaries, uploads the compose file and image context, backs up,
+      starts the new tag, rolls back if `/health` fails, checks the public
+      URL, keeps the last two images.
+- [x] `deploy/firewall-cloudflare.sh`: ports 80/443 accept only Cloudflare's
+      published ranges (22 ranges); drops ranges Cloudflare no longer lists;
+      monthly cron `/etc/cron.d/balce-cloudflare-firewall`.
+- [x] PRs: balceinv-api #59, balceinv #32.
+
+### Verification performed
+- `go test ./...` with `TEST_DATABASE_URL`: 34 packages pass on SQLite and
+  Postgres. The new visitor-address test fails with the server change
+  removed; a forged header from an untrusted address stays limited.
+- `deploy.sh --dry-run`, then two real deploys: migrations 0 → 52, API uses
+  7.6 MiB; the second deploy recreated only `balce-api`.
+- Through Cloudflare: `/health` 200, `/` and `/login` 200 (web app),
+  `/api/platform` 200, `server: cloudflare`; `/api/setup/status` reports
+  `configured: true` and `POST /api/setup` is refused in the cloud.
+- On the server, `ss` shows tunnel traffic reaching the container from
+  172.31.250.1, the trusted address.
+- Firewall: `https://140.99.254.193`, `http://140.99.254.193` and
+  `:8080` time out from outside; `faltasi.wapangaji.com` still 200 through
+  Cloudflare; a second run of the firewall script changes nothing.
+- Browser: the login page loads at https://api-pos.faltasi.com with no
+  console errors and no setup link.
+
+### Phase 17: cloud sign-up and pos.faltasi.com (2026-09-30)
+
+### Findings fixed
+- The cloud refused `POST /api/setup`, so a new business could only be
+  created by the administrator (`backend/internal/tenancy/handler.go`).
+- First-time visitors had no way to find sign-up; the splash always sent the
+  cloud to sign in (`frontend/app/pages/index.vue`).
+
+### Implementation status
+- [x] Cloud `POST /api/setup` creates a new company for each new owner,
+      ten attempts an hour per network (`newSignupLimiter` in
+      `backend/internal/server/routes.go`); `GET /api/setup/status` reports
+      `signup_open: true` in the cloud.
+- [x] Splash: with sign-up open, a browser that never signed in goes to
+      `/setup`, a returning one to `/login` (`hasSignedInBefore` in
+      `frontend/app/composables/useAuth.ts`). The login page links to setup
+      again, and a new owner is signed straight in after creating the business.
+- [x] `ALLOWED_ORIGINS=https://pos.faltasi.com,https://api-pos.faltasi.com`.
+- [x] PRs: balceinv-api #60, balceinv #33.
+
+### Verification performed
+- `go test ./...`: 34 packages pass on SQLite and Postgres. The cloud case
+  signs up two businesses, refuses a repeated email with `email_taken`, keeps
+  each owner's products apart, and limits the eleventh attempt with 429.
+- `pnpm generate` and the locales check pass.
+- Local cloud preview (Postgres scratch database, since dropped): first visit
+  went to `/setup`, creating a business opened the till signed in as its
+  owner, a later visit went to `/login` with the setup link shown.
+- Production after deploy: `/api/setup/status` returns `signup_open: true`;
+  a fresh browser on the live site lands on `/setup`.
+
+### Phase 18: menu scroll, cloud account menu, first-time tour, auto-deploy (2026-09-30)
+
+### Findings fixed
+- The side menu could not scroll, so with every feature on, Settings and Roles
+  were out of reach (`frontend/app/components/CustomSidebar.vue`).
+- The cloud account menu showed a hardware ID stuck on "Loading…": only a
+  desktop server has one, and the cloud has no hardware-ID or license route.
+  License and hardware-ID calls now run only against a desktop server, and
+  "Check for updates" shows only in the desktop app
+  (`frontend/app/composables/useLicense.ts`, `frontend/app/components/AppHeader.vue`).
+- New users had no guidance.
+
+### Tour plan (one step at a time)
+- [x] **Step 1:** tour engine (driver.js, MIT, no dependencies) with Balce
+      styling in light and dark, English and Kiswahili, skip on every step,
+      "Show the tour" in the account menu. Tours: Welcome (menu, header, the
+      three first setup steps), Settings, Products, Point of Sale.
+- [ ] **Step 2:** Users and Roles (add a cashier, what roles allow), Shops
+      (add a branch, receipt prefix), Stock (change stock, send stock).
+- [ ] **Step 3:** the optional features, each shown the first time its page
+      opens after it is switched on: Customers and credit (madeni), Orders,
+      Suppliers and purchases, Money (simple and full books).
+- [ ] **Step 4:** Reports and Dashboard, Discounts, Sales history and
+      refunds; a "Getting started" checklist on the dashboard (business
+      details, logo, first product, first cashier, first sale).
+- [ ] **Step 5:** remember seen tours on the server so a new device does not
+      repeat them (today: per user on this device).
+
+### Auto-deploy to the cloud
+- [x] `.github/workflows/deploy-cloud.yml`: on every push to `main` (or by
+      hand), tests the backend on SQLite and Postgres, checks translations,
+      then runs `backend/deploy/deploy.sh` against the server, checking
+      https://pos.faltasi.com at the end. One deploy at a time.
+- [x] Deploy key `balce-github-deploy` (ed25519) in the server's
+      `authorized_keys` with forwarding off; private key and pinned host keys
+      stored as the GitHub secrets `DEPLOY_SSH_KEY` and `DEPLOY_KNOWN_HOSTS`;
+      the local copy of the private key was deleted.
+
+### Verification performed
+- Local cloud preview (Postgres scratch database, since dropped):
+  - The welcome tour ran all 10 steps at 1366 px.
+  - The Products tour ran in Kiswahili, with no Back button on its first step.
+  - The Settings tour ran at 375 px, with page width equal to the screen (375/375).
+  - The Point of Sale tour ran in Kiswahili.
+  - On a 480 px tall screen the menu scrolls: 618 px of menu in a 327 px area, and Settings is reachable.
+  - After sign-in, no license or hardware-ID requests were made.
+- `pnpm generate`; locales check: 2433 keys in each language.
+- The deploy key signed in to the server with `IdentitiesOnly`.
+- PR: balceinv #34.
+
+### Manual follow-up required
+- The first run of "Deploy cloud" happens when this PR merges into `main`;
+  watch it in GitHub Actions.
+- Anyone who can change workflows in this repository can use the deploy key,
+  which logs in as root. Keep write access to the owner and trusted team.
+- Before tagging a desktop release, add the `SUPPORT_SMTP_PASSWORD` secret;
+  without it, support messages from desktop apps wait until a later release.
+
+## Manual follow-up required
+- Add the route `pos.faltasi.com` → `http://localhost:8080` in Networking →
+  Tunnels → balce-server → Routes.
+- Sign-up can be shut off at once by a Cloudflare WAF rule blocking
+  `POST /api/setup` if it is abused; Turnstile on the setup form is the
+  upgrade if bots appear.
+
+## Manual follow-up required
+- Add `SUPPORT_SMTP_PASSWORD=<Yahoo app password>` to
+  `/opt/balce/.env.prod` and run `deploy.sh`; until then support messages
+  wait in the database.
+- Create the first cloud company:
+  `docker exec balce-api /balce-admin create-company -business-name "…" -owner-name "…" -owner-email "…"`
+  (it prints a one-time password; the owner must change it at first sign-in).
+- The tunnel token was shared in chat: refresh it in Networking → Tunnels →
+  balce-server, then `cloudflared service uninstall` and install again with
+  the new token.
+- SSH (22) stays open to the internet with password login, by the owner's
+  decision.
+
 ## Manual follow-up required
 _Collected from the phases above as they complete._
 
