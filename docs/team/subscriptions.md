@@ -60,7 +60,7 @@ Use this when the customer pays you in cash, by bank transfer, or to your number
 | :--- | :--- |
 | **Locked** (grace period over) | Within about a minute, from the lock screen. |
 | Still on the **free trial** | The next time the page is opened or refreshed (desktop: the next time Balce is opened). |
-| On a **paid plan** that has not ended | Desktop: the next time Balce is closed and opened again. Online: when the plan ends, or when the owner presses **Check again** on the payment screen. |
+| On a **paid plan** that has not ended | As soon as the old plan is within 7 days of ending, the next time the page is opened (desktop: the next time Balce is opened). The added days are already safe on our server, and they are added to the end of the current plan. |
 
 Both ways create the same licence on our server. A licence made with the sales tool is just as valid as one the customer paid for inside the POS.
 
