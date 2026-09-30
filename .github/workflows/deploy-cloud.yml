@@ -1,0 +1,91 @@
+name: Deploy cloud
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-cloud
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: balce
+          POSTGRES_PASSWORD: balce_ci_only
+          POSTGRES_DB: balce
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U balce -d balce"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Test the backend on SQLite and Postgres
+        env:
+          TEST_DATABASE_URL: postgres://balce:balce_ci_only@127.0.0.1:5432/balce?sslmode=disable
+        run: |
+          cd backend
+          go vet ./...
+          go test ./... -count=1
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          cache-dependency-path: 'frontend/pnpm-lock.yaml'
+
+      - name: Check the translations
+        run: |
+          pnpm --dir frontend install --frozen-lockfile
+          node --experimental-strip-types frontend/scripts/locales.check.ts
+
+      - name: Load the deploy key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Deploy to the server
+        env:
+          BALCE_SERVER: root@140.99.254.193
+          BALCE_PUBLIC_URL: https://pos.faltasi.com
+        run: backend/deploy/deploy.sh
+
+      - name: Remove the deploy key
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519
