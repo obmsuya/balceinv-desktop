@@ -1590,7 +1590,65 @@ public web port of its own; visitors reach it only through Cloudflare.
 - Production after deploy: `/api/setup/status` returns `signup_open: true`;
   a fresh browser on the live site lands on `/setup`.
 
+### Phase 18: menu scroll, cloud account menu, first-time tour, auto-deploy (2026-09-30)
+
+### Findings fixed
+- The side menu could not scroll, so with every feature on, Settings and Roles
+  were out of reach (`frontend/app/components/CustomSidebar.vue`).
+- The cloud account menu showed a hardware ID stuck on "Loading…": only a
+  desktop server has one, and the cloud has no hardware-ID or license route.
+  License and hardware-ID calls now run only against a desktop server, and
+  "Check for updates" shows only in the desktop app
+  (`frontend/app/composables/useLicense.ts`, `frontend/app/components/AppHeader.vue`).
+- New users had no guidance.
+
+### Tour plan (one step at a time)
+- [x] **Step 1:** tour engine (driver.js, MIT, no dependencies) with Balce
+      styling in light and dark, English and Kiswahili, skip on every step,
+      "Show the tour" in the account menu. Tours: Welcome (menu, header, the
+      three first setup steps), Settings, Products, Point of Sale.
+- [ ] **Step 2:** Users and Roles (add a cashier, what roles allow), Shops
+      (add a branch, receipt prefix), Stock (change stock, send stock).
+- [ ] **Step 3:** the optional features, each shown the first time its page
+      opens after it is switched on: Customers and credit (madeni), Orders,
+      Suppliers and purchases, Money (simple and full books).
+- [ ] **Step 4:** Reports and Dashboard, Discounts, Sales history and
+      refunds; a "Getting started" checklist on the dashboard (business
+      details, logo, first product, first cashier, first sale).
+- [ ] **Step 5:** remember seen tours on the server so a new device does not
+      repeat them (today: per user on this device).
+
+### Auto-deploy to the cloud
+- [x] `.github/workflows/deploy-cloud.yml`: on every push to `main` (or by
+      hand), tests the backend on SQLite and Postgres, checks translations,
+      then runs `backend/deploy/deploy.sh` against the server, checking
+      https://pos.faltasi.com at the end. One deploy at a time.
+- [x] Deploy key `balce-github-deploy` (ed25519) in the server's
+      `authorized_keys` with forwarding off; private key and pinned host keys
+      stored as the GitHub secrets `DEPLOY_SSH_KEY` and `DEPLOY_KNOWN_HOSTS`;
+      the local copy of the private key was deleted.
+
+### Verification performed
+- Local cloud preview (Postgres scratch database, since dropped):
+  - The welcome tour ran all 10 steps at 1366 px.
+  - The Products tour ran in Kiswahili, with no Back button on its first step.
+  - The Settings tour ran at 375 px, with page width equal to the screen (375/375).
+  - The Point of Sale tour ran in Kiswahili.
+  - On a 480 px tall screen the menu scrolls: 618 px of menu in a 327 px area, and Settings is reachable.
+  - After sign-in, no license or hardware-ID requests were made.
+- `pnpm generate`; locales check: 2433 keys in each language.
+- The deploy key signed in to the server with `IdentitiesOnly`.
+- PR: balceinv #34.
+
 ### Manual follow-up required
+- The first run of "Deploy cloud" happens when this PR merges into `main`;
+  watch it in GitHub Actions.
+- Anyone who can change workflows in this repository can use the deploy key,
+  which logs in as root. Keep write access to the owner and trusted team.
+- Before tagging a desktop release, add the `SUPPORT_SMTP_PASSWORD` secret;
+  without it, support messages from desktop apps wait until a later release.
+
+## Manual follow-up required
 - Add the route `pos.faltasi.com` → `http://localhost:8080` in Networking →
   Tunnels → balce-server → Routes.
 - Sign-up can be shut off at once by a Cloudflare WAF rule blocking
