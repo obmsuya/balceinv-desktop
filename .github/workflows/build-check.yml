@@ -103,9 +103,11 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm --prefix frontend install
 
-      - name: Check the translations
+      - name: Check the translations and amount formatting
         if: matrix.platform == 'ubuntu-22.04'
-        run: node --experimental-strip-types frontend/scripts/locales.check.ts
+        run: |
+          node --experimental-strip-types frontend/scripts/locales.check.ts
+          node --experimental-strip-types frontend/scripts/amountText.check.ts
 
       - name: Build the desktop app (no release, no signing)
         uses: tauri-apps/tauri-action@v0

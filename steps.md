@@ -2045,6 +2045,44 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - Sales staff on POS_MASTER v.1.0.0 or v.1.0.1 must download v.1.0.3 by hand;
   v.1.0.2 offers the update itself.
 
+## Phase 26: amounts shown with commas as people type (2026-09-30)
+
+### Findings being fixed
+- Money fields showed raw digits while typing (1500000), which were hard to
+  read and easy to get wrong. Amounts on screen were already formatted.
+
+### Implementation status
+- [x] `frontend/app/utils/amountText.ts`: cleans typed text, groups thousands
+      with commas and keeps the cursor in place. Currencies with no decimals
+      drop anything after a dot.
+- [x] `frontend/app/components/MoneyInput.vue`: shows the grouped text but
+      hands the form the plain number, so no saving code changed. It uses the
+      currency's decimals, or 2 for a percentage discount.
+- [x] Used for 25 money fields: products, customers, suppliers and purchases,
+      orders, discounts, Money and the POS payment box. Quantity fields are
+      unchanged.
+- [x] `frontend/scripts/amountText.check.ts` runs in Build check and Deploy
+      cloud.
+- [x] PR: balceinv #43.
+
+### Verification performed
+- `node --experimental-strip-types frontend/scripts/amountText.check.ts`
+  passes. It covers grouping, pasted amounts with commas, leading zeros,
+  letters, decimals and cursor position. It caught one bug before release:
+  1500.50 had become 150,050.
+- `pnpm generate` and the locales check pass.
+- Local cloud preview:
+  - typing 1500000 in Money out showed 1,500,000;
+  - typing a 2 in the middle gave 12,500,000 with the cursor after the 2;
+  - backspace kept the grouping;
+  - saving recorded TSh 1,500,000;
+  - in the POS payment box, the total showed 11,800, quick cash 20,000 gave
+    TSh 8,200 change, and typing 50,000 gave TSh 38,200 change.
+
+### Manual follow-up required
+- On a touch till, check the on-screen keypad in Point of Sale → Pay. It was
+  not on screen at the preview width.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
