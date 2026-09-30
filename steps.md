@@ -1788,6 +1788,66 @@ before the pattern is copied.
   the same document design.
 - Step 4: Money as a recording page with one transactions table.
 
+## Phase 22: accounting reports, step 3 — every report in Reports (2026-09-30)
+
+### Findings being fixed
+- Sales and stock exports did not match the document design of the book
+  statements (`backend/internal/reports/export.go`).
+- There was no document for customers who owe or for what we owe suppliers
+  (`backend/internal/customers/statement_document.go`,
+  `backend/internal/suppliers/statement_document.go`).
+- The Reports page was built from pills, stat cards and tabs, and books sat in
+  a separate tab (`frontend/app/pages/reports/index.vue`,
+  `frontend/app/components/reports/BooksPanel.vue`).
+
+### Implementation status
+- [x] Shared previous-period rule and headings
+      (`backend/internal/documents/period.go`); profit and loss uses it.
+- [x] Sales report as a statement compared with the previous period, covering:
+  - takings, VAT, net sales, cost, gross profit and margin;
+  - how customers paid;
+  - discounts and average sale.
+- [x] Registers with a summary strip and totals for:
+  - sales per day, products sold (with ranking), sales per staff member and
+    sales per shop;
+  - stock on hand, with an out-of-stock / running-low status;
+  - stock not selling (`backend/internal/reports/documents.go`).
+- [x] Customers who owe and what we owe suppliers, each with ageing columns.
+      They come through `?format=` on `/api/customers/debtors` and
+      `/api/suppliers/aging`.
+- [x] Count totals in Excel registers use whole-number formatting.
+- [x] Reports page as one table grouped into Sales, Stock, Customers and
+      suppliers, and Financial statements:
+  - every row has Preview, Excel and PDF;
+  - filters are a Period select, dates and a shop;
+  - products have a "Rank by" picker; account statements keep the account
+    picker.
+- [x] PRs: balceinv-api #65, balceinv #38.
+
+### Verification performed
+- `go vet ./...` and `go test ./...` pass on SQLite and Postgres. Excel values
+  are checked against the API:
+  - gross profit formula;
+  - daily takings 4,720 over 2 sales;
+  - stock at cost 98×600 + 99×900 + 7×200;
+  - customers who owe 10,000;
+  - suppliers we owe 17,000;
+  - no data leaks between companies.
+- Sample PDFs were read in English and Kiswahili. Products sold totals
+  127,440 / 108,000 / 70,200 / 37,800. Stock value at cost 1,225,900.
+- A column fix came out of that review: "Last sold" on stock not selling was
+  squeezed against the money column. It now comes before the quantities.
+- `pnpm generate` and `node scripts/locales.check.ts` pass.
+- Local cloud preview (full books, VAT, supplier, credit customer):
+  - all 14 reports previewed without errors;
+  - customers who owe showed 17,700 − 5,000 = 12,700;
+  - "Rank by: Profit" sent `sort=profit`;
+  - a start date after the end date disables the period reports while the
+    stock reports stay available.
+
+### Next steps
+- Step 4: Money as a recording page with one transactions table.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
