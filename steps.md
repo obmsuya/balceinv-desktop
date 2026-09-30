@@ -1968,6 +1968,70 @@ POS_MASTER and wapangaji were read on 2026-09-30.
   - partner accounts can register themselves and record payments.
   Decide how to lock both down.
 
+## Phase 25: subscriptions for web businesses, sales tool fixes (2026-09-30)
+
+### Findings being fixed
+- The web version had no subscription at all. Licensing only worked on the
+  desktop, where it is tied to one computer's hardware ID
+  (`backend/internal/config/config.go`, `EnforceLicense`).
+- A desktop still on the free trial did not notice an activation from the
+  sales tool until the trial and grace days ran out.
+- POS_MASTER (the sales tool):
+  - it lost its sign-in every second launch and after a few hours of use,
+    because it discarded the rotated refresh token and never re-saved the
+    session;
+  - it accepted shortened device IDs.
+
+### Implementation status
+- [x] `company_subscriptions`: migration 000054 in both engines, with RLS.
+  Existing businesses got 14 days from the migration; new businesses get
+  14 days when created, from self-signup or the admin tool
+  (`backend/internal/tenancy`).
+- [x] Web ID `cloud-<company id>`. It uses the same Wapangaji plans, payment
+  and licence record as the desktop, so the sales tool works unchanged
+  (`backend/internal/subscriptions`).
+- [x] Web lock: after the 5-day grace, signed-in routes return 402
+  `subscription_required`. Sign-in, licence, support and platform routes stay
+  open.
+- [x] Frontend:
+  - the badge, payment flow and lock screen run on the web too;
+  - the web ID is called "Subscription ID";
+  - during a trial the app asks the licensing server once per page load, on
+    both platforms, so sales-tool activations show at once.
+- [x] POS_MASTER v.1.0.3:
+  - keeps the rotated refresh token and saves the session after every
+    refresh;
+  - on a 401 it refreshes once and retries once;
+  - it accepts only full 64-character or `cloud-<uuid>` IDs.
+- [x] PRs: balceinv-api #67, balceinv #41, POS_MASTER #1 (tag v.1.0.3).
+- [x] `docs/team/subscriptions.md` updated for the web.
+
+### Verification performed
+- `go vet ./...` and `go test ./...` pass on SQLite and Postgres. New tests
+  use a fake Wapangaji and cover:
+  - the 14-day trial and the grace period;
+  - the lock for the owner and cashiers, with the pay-screen routes left
+    open;
+  - no effect between businesses;
+  - owner-only payment, sent as `cloud-<id>`;
+  - refresh before and after payment;
+  - an older licence never shortening a newer one;
+  - a trial picking up a sales-tool activation straight away.
+- Local cloud preview:
+  - the migrated business showed a 14-day trial and the header badge;
+  - once expired in the database, the page showed the lock screen with the
+    real plans and the Subscription ID, and data calls returned 402.
+- POS_MASTER: `go test ./...` passes, including tests for the rotated token,
+  the refresh-and-retry on 401 (no loop), and the ID check.
+
+### Manual follow-up required
+- After this deploys, every existing web business is on a 14-day trial ending
+  about 14 Oct 2026. Tell them before it runs out.
+- The live Wapangaji plan list includes "Dev License" at TSh 100, and web
+  owners will see it. Remove or hide it in Wapangaji.
+- Sales staff on POS_MASTER v.1.0.0 or v.1.0.1 must download v.1.0.3 by hand;
+  v.1.0.2 offers the update itself.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.

@@ -2,7 +2,14 @@
 
 A guide for the Balce sales and support team. No technical knowledge needed.
 
-Subscriptions apply to the **desktop app** only. The online version at pos.faltasi.com does not ask for a subscription.
+Subscriptions apply to **both** the desktop app and the online version at pos.faltasi.com. They work the same way. The only difference is the ID:
+
+| | ID | Where to find it |
+| :--- | :--- | :--- |
+| Desktop app | **Hardware ID** (64 letters and numbers, one per computer) | Account menu → Hardware ID (Kitambulisho cha kifaa) |
+| Online (pos.faltasi.com) | **Subscription ID** (starts with `cloud-`, one per business) | Account menu → Subscription ID (Kitambulisho cha usajili) |
+
+Clicking the ID in the account menu copies the full ID.
 
 Button names are written as **English (Kiswahili)**.
 
@@ -12,10 +19,10 @@ Button names are written as **English (Kiswahili)**.
 
 | Question | Answer |
 | :--- | :--- |
-| How long is the free trial? | **14 days** from the day the business is created on that computer. Everything works. |
+| How long is the free trial? | **14 days**. On the desktop it starts when the business is created on that computer. Online it starts when the business signs up. Online businesses that already existed got 14 days from 30 Sep 2026. Everything works during the trial. |
 | What happens when the trial or a plan ends? | A **5-day grace period**. Everything still works, with red "renew" warnings. |
 | What happens after the grace period? | The POS **locks**: no selling, no reports, and other tills connected to that computer stop too. **No data is lost.** It all comes back the moment the POS is renewed. |
-| Does the POS need internet every day? | No. It works offline until the plan (plus the 5 grace days) runs out. Internet is only needed to pay or renew. |
+| Does the POS need internet every day? | Desktop: no. It works offline until the plan (plus the 5 grace days) runs out, and internet is only needed to pay or renew. Online: it always needs internet anyway. |
 | Who can pay? | Only the **owner** (or an admin signed in as owner). Other staff see "Ask the owner or an admin to renew". |
 
 ---
@@ -44,16 +51,16 @@ The owner opens the plans (from the badge at the top, or the lock screen), picks
 
 Use this when the customer pays you in cash, by bank transfer, or to your number.
 
-1. On the customer's computer, open the account menu (the initials at the top right) and click **Hardware ID (Kitambulisho cha kifaa)**. This **copies the full ID**. Send it to yourself (WhatsApp or SMS).
-   - **Always use the copy.** The screen only shows the first few characters. A shortened ID creates a licence that the computer will never find.
+1. On the customer's screen, open the account menu (the initials at the top right) and click **Hardware ID (Kitambulisho cha kifaa)** on the desktop, or **Subscription ID (Kitambulisho cha usajili)** online. This **copies the full ID**. Send it to yourself (WhatsApp or SMS).
+   - **Always use the copy.** The screen only shows the first few characters. The sales tool (version v.1.0.3 or newer) refuses anything that is not a full ID.
 2. In the sales tool, choose **Activate / Renew**, paste the full Device ID, pick the plan, and record the payment (amount, method, reference).
 3. The licence is created on our server straight away. When the computer picks it up depends on its state:
 
-| The computer is… | It picks up the new plan… |
+| The POS is… | It picks up the new plan… |
 | :--- | :--- |
 | **Locked** (grace period over) | Within about a minute, from the lock screen. |
-| On a **paid plan** that has not ended | The next time the Balce app is **closed and opened again**. |
-| Still on the **free trial** | **Not until the trial and grace days run out.** It keeps showing "Free trial" until then, and then switches to the paid plan by itself. Tell the customer this is expected. |
+| Still on the **free trial** | The next time the page is opened or refreshed (desktop: the next time Balce is opened). |
+| On a **paid plan** that has not ended | Desktop: the next time Balce is closed and opened again. Online: when the plan ends, or when the owner presses **Check again** on the payment screen. |
 
 Both ways create the same licence on our server. A licence made with the sales tool is just as valid as one the customer paid for inside the POS.
 
@@ -61,14 +68,14 @@ Both ways create the same licence on our server. A licence made with the sales t
 > - **Search by phone** may not find customers who paid inside the POS, because their phone number is saved in a different format. Search by Device ID instead.
 > - **Payment history** in the sales tool lists only payments recorded with the tool.
 > - **Amount check:** the tool accepts whatever amount you type. Check it against the plan price before saving.
-> - **Sign-in:** you may be asked to sign in again more often than every 12 hours. This is expected; sign in and carry on.
+> - **Sign-in:** since v.1.0.3 the tool stays signed in and refreshes the sign-in by itself. If it still asks, update it (it offers the update when it starts).
 
 ---
 
 ## Common questions from customers
 
 **"We paid but it still says Free trial."**
-If they paid inside the POS, wait a minute and press **Check again**. If you activated it with the sales tool and they are still on the trial, it switches over when the trial ends (see the table above). Nothing is lost: the paid days are already on our server.
+If they paid inside the POS, wait a minute and press **Check again**. If you activated it with the sales tool, ask them to refresh the page (desktop: close and open Balce). Nothing is lost: the paid days are already on our server.
 
 **"We changed or repaired the computer."**
 The new computer has a new Device ID. Activate the new ID. Old IDs keep using up a device slot on the plan until support removes them.
