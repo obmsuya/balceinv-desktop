@@ -1559,7 +1559,45 @@ public web port of its own; visitors reach it only through Cloudflare.
 - Browser: the login page loads at https://api-pos.faltasi.com with no
   console errors and no setup link.
 
+### Phase 17: cloud sign-up and pos.faltasi.com (2026-09-30)
+
+### Findings fixed
+- The cloud refused `POST /api/setup`, so a new business could only be
+  created by the administrator (`backend/internal/tenancy/handler.go`).
+- First-time visitors had no way to find sign-up; the splash always sent the
+  cloud to sign in (`frontend/app/pages/index.vue`).
+
+### Implementation status
+- [x] Cloud `POST /api/setup` creates a new company for each new owner,
+      ten attempts an hour per network (`newSignupLimiter` in
+      `backend/internal/server/routes.go`); `GET /api/setup/status` reports
+      `signup_open: true` in the cloud.
+- [x] Splash: with sign-up open, a browser that never signed in goes to
+      `/setup`, a returning one to `/login` (`hasSignedInBefore` in
+      `frontend/app/composables/useAuth.ts`). The login page links to setup
+      again, and a new owner is signed straight in after creating the business.
+- [x] `ALLOWED_ORIGINS=https://pos.faltasi.com,https://api-pos.faltasi.com`.
+- [x] PRs: balceinv-api #60, balceinv #33.
+
+### Verification performed
+- `go test ./...`: 34 packages pass on SQLite and Postgres. The cloud case
+  signs up two businesses, refuses a repeated email with `email_taken`, keeps
+  each owner's products apart, and limits the eleventh attempt with 429.
+- `pnpm generate` and the locales check pass.
+- Local cloud preview (Postgres scratch database, since dropped): first visit
+  went to `/setup`, creating a business opened the till signed in as its
+  owner, a later visit went to `/login` with the setup link shown.
+- Production after deploy: `/api/setup/status` returns `signup_open: true`;
+  a fresh browser on the live site lands on `/setup`.
+
 ### Manual follow-up required
+- Add the route `pos.faltasi.com` → `http://localhost:8080` in Networking →
+  Tunnels → balce-server → Routes.
+- Sign-up can be shut off at once by a Cloudflare WAF rule blocking
+  `POST /api/setup` if it is abused; Turnstile on the setup form is the
+  upgrade if bots appear.
+
+## Manual follow-up required
 - Add `SUPPORT_SMTP_PASSWORD=<Yahoo app password>` to
   `/opt/balce/.env.prod` and run `deploy.sh`; until then support messages
   wait in the database.
