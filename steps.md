@@ -2024,8 +2024,21 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - POS_MASTER: `go test ./...` passes, including tests for the rotated token,
   the refresh-and-retry on 401 (no loop), and the ID check.
 
+### Incident during the deploy
+- Migration 000054's copy of every company into `company_subscriptions`
+  inserted nothing in production. It runs as `balce_owner` under FORCE
+  row-level security, so it saw no companies. Local tests missed this because
+  the local role is a superuser.
+- The 7 web businesses were locked for a few minutes. Their rows were then
+  inserted as the database superuser (trials end 14 Oct 2026).
+- Fix (balceinv-api #68): a missing row now starts a 14-day trial in its own
+  write transaction instead of locking. A test covers it.
+- Lesson: a Postgres data migration that reads tenant tables sees nothing in
+  production. Do data fixes in application code, or run them as the
+  superuser on purpose.
+
 ### Manual follow-up required
-- After this deploys, every existing web business is on a 14-day trial ending
+- Every existing web business is on a 14-day trial ending
   about 14 Oct 2026. Tell them before it runs out.
 - The live Wapangaji plan list includes "Dev License" at TSh 100, and web
   owners will see it. Remove or hide it in Wapangaji.
