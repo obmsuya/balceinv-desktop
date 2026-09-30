@@ -1640,7 +1640,77 @@ public web port of its own; visitors reach it only through Cloudflare.
 - The deploy key signed in to the server with `IdentitiesOnly`.
 - PR: balceinv #34.
 
-### Manual follow-up required
+### Phase 19: accounting reports, step 1 — profit and loss (2026-09-30)
+
+Decision: every report moves to Reports; Money keeps recording and its
+transactions table (step 4). Step 1 is the reference document, reviewed
+before the pattern is copied.
+
+### Findings fixed
+- Accounting exports reused the generic table template: no statement
+  structure, no comparison, no notes or sign-off
+  (`backend/internal/accounting/export.go`).
+- Exports downloaded blind; nothing could be previewed.
+- Month to date was compared with the same number of days before it
+  (15–31 Aug for 1–17 Sep) instead of the same days last month.
+- A one-shop statement for a one-shop business left out costs recorded for
+  the whole business (rent, salaries), turning a loss into a profit.
+
+### Implementation status
+- [x] `documents.Statement` with PDF and Excel renderers
+      (`backend/internal/documents/statement*.go`):
+  - letterhead, period and comparison;
+  - sections with indented accounts and codes;
+  - ruled subtotals, a shaded gross profit and a shaded, double-ruled net
+    profit or loss;
+  - margins, the previous period and the change, bracketed negatives;
+  - numbered notes, and prepared by and approved by lines;
+  - "(continued)" headings on new pages;
+  - in Excel, a formula for every total, the header frozen and repeated on
+    A4, and recalculation when the file opens;
+  - statements that don't add up are refused.
+- [x] Profit and loss statement
+      (`backend/internal/accounting/profit_and_loss_statement.go`) against
+      the previous month, quarter, year, same days last month or same
+      length, all shops or one, English and Kiswahili.
+- [x] Preview dialog (`frontend/app/components/reports/DocumentPreviewDialog.vue`)
+      drawn with pdf.js (legacy build) at the screen's pixel density, with
+      Excel, PDF and Print (page images, same on every platform).
+- [x] Reports → Books tab: a table of statements with Preview, Excel, PDF.
+- [x] PRs: balceinv-api #62, balceinv #35.
+
+### Verification performed
+- `go test ./...`: 34 packages pass on SQLite and Postgres.
+  - Excel totals recalculated with excelize match the ledger; breaking the
+    subtraction formula fails the test.
+  - The PDF has 1 page for a short statement and 3+ for 120 accounts.
+  - Previous-period rules, including leap February.
+  - An empty period says so; a one-shop statement names the shop and what
+    it leaves out.
+  - Bad dates, shops and formats are refused.
+- Sample statements read page by page, English, Kiswahili and 3 pages long.
+- Local cloud preview with real books (6 sales, 4 expenses):
+  - The preview showed net loss TSh 126,650, equal to the ledger.
+  - Kiswahili account names and codes were right.
+  - The Excel download saved.
+  - At 375 px the page redrew at 341 px (682 px canvas) with no sideways
+    scroll.
+- `pnpm generate`; locales check: 2448 keys in each language.
+
+### Found, not fixed in this step
+- The till treats every price as including the settings tax rate (18% by
+  default) even when the business is not VAT registered, so the sales
+  overview's gross profit (TSh 66,015 in the preview) disagrees with the
+  books (TSh 104,150, which is right for a business that collects no VAT).
+  Fix proposal: the till applies tax only when VAT registration is on.
+
+### Next steps
+- Step 2: balance sheet, trial balance, cash book / account statement, VAT
+  return, simple-books summary, customer and supplier statements.
+- Step 3: Reports as one list for every report, all with the same design.
+- Step 4: Money as a recording page with one transactions table.
+
+## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
 - Anyone who can change workflows in this repository can use the deploy key,
