@@ -49,6 +49,8 @@ The owner opens the plans (from the badge at the top, or the lock screen), picks
 
 ### 2. We activate it with the sales tool (Faltasi Control Centre / POS_MASTER)
 
+How to get the tool and every screen in it: [The sales tool](sales-tool.md). What happens behind the scenes: [How subscription payments work](how-payments-work.md).
+
 Use this when the customer pays you in cash, by bank transfer, or to your number.
 
 1. On the customer's screen, open the account menu (the initials at the top right) and click **Hardware ID (Kitambulisho cha kifaa)** on the desktop, or **Subscription ID (Kitambulisho cha usajili)** online. This **copies the full ID**. Send it to yourself (WhatsApp or SMS).
