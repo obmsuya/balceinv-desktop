@@ -10,6 +10,8 @@ Guides for the Balce sales and support team: how to set a shop up, how to answer
 | [Loading common products](common-products.md) | Preparing and uploading the product catalog |
 | [Subscriptions and activation](subscriptions.md) | Free trial, grace period, locking, paying in the POS, activating with the sales tool |
 | [Recording expenses](recording-expenses.md) | Switching the books on, starting them, and recording money out |
+| [How subscription payments work](how-payments-work.md) | What happens between the POS, Wapangaji and mobile money, step by step, and where it gets stuck |
+| [The sales tool](sales-tool.md) | Getting the FALTASI POS Control Centre, signing in, activating, searching, payment history and plans |
 
 ## Planned
 
@@ -41,9 +43,8 @@ Written in this order, most-asked first. Each guide follows the same shape: the 
 - Backups: where they are and how to restore one.
 - Updates: how the desktop app updates itself.
 
-**5. For our team only**
-- The admin tool: creating a cloud business from the command line.
-- The sales tool (Faltasi Control Centre): signing in, activating, payment history.
+**5. For the technical team only**
+- The server admin tool (`balce-admin`): creating an online business from the server.
 
 ## How we keep it useful
 

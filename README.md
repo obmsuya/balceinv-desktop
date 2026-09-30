@@ -95,6 +95,8 @@ Step-by-step guides for the sales and support team, written for non-technical st
 * [Loading common products (the catalog)](docs/team/common-products.md): preparing the Excel file, opening the team screen, uploading, and checking the list.
 * [Subscriptions and activation](docs/team/subscriptions.md): the free trial, the 5-day grace period, what a locked POS looks like, and activating with the sales tool.
 * [Recording expenses](docs/team/recording-expenses.md): switching the books on, starting them, and recording money out.
+* [How subscription payments work](docs/team/how-payments-work.md): the POS, Wapangaji and mobile money, step by step, and where a payment can get stuck.
+* [The sales tool](docs/team/sales-tool.md): downloading the FALTASI POS Control Centre, signing in, and activating or renewing a shop.
 * [The whole handbook](docs/team/README.md): every guide, and the ones planned next.
 
 ---
