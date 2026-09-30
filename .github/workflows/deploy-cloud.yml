@@ -65,10 +65,11 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: 'frontend/pnpm-lock.yaml'
 
-      - name: Check the translations
+      - name: Check the translations and amount formatting
         run: |
           pnpm --dir frontend install --frozen-lockfile
           node --experimental-strip-types frontend/scripts/locales.check.ts
+          node --experimental-strip-types frontend/scripts/amountText.check.ts
 
       - name: Load the deploy key
         env:
