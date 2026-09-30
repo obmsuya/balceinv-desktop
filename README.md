@@ -97,6 +97,7 @@ Step-by-step guides for the sales and support team, written for non-technical st
 * [Recording expenses](docs/team/recording-expenses.md): switching the books on, starting them, and recording money out.
 * [How subscription payments work](docs/team/how-payments-work.md): the POS, Wapangaji and mobile money, step by step, and where a payment can get stuck.
 * [The sales tool](docs/team/sales-tool.md): downloading the FALTASI POS Control Centre, signing in, and activating or renewing a shop.
+* [Desktop or online, and moving a shop online](docs/team/moving-online.md): why the desktop app and pos.faltasi.com keep separate data, and how to move a desktop shop online.
 * [The whole handbook](docs/team/README.md): every guide, and the ones planned next.
 
 ---
