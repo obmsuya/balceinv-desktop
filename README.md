@@ -87,6 +87,15 @@ pnpm tauri dev
 ```
 ---
 
+## 📘 Guides for the Balce team
+
+Step-by-step guides for the sales and support team, written for non-technical staff:
+
+* [Creating a business](docs/team/create-a-business.md): at the shop with the desktop app, at the shop online, or the customer alone at pos.faltasi.com.
+* [Loading common products (the catalog)](docs/team/common-products.md): preparing the Excel file, opening the team screen, uploading, and checking the list.
+
+---
+
 ## 🧰 Team Tools: Common Products
 
 Sales and support staff load lists of common products (medicines for pharmacies, tools for hardware stores, …). Shops then pick from the list when they add a product, so the name, unit, category and price fill in by themselves. Shop staff never see the upload screen, only the finished list.
@@ -131,7 +140,7 @@ Any other column, such as `strength` or `form`, is kept as a product detail. Bla
 Lists uploaded on one PC stay on that PC. To give a list to every shop:
 
 1. Press **Export for bundling** and save the file (for example `pharmacy.json`).
-2. Commit it as `backend/seeds/<business type>.json`.
+2. Commit it as `backend/internal/catalog/seeds/<business type>.json`.
 3. Release a new version. New installs, and existing shops whose list for that type is empty, get it on their next start.
 
 ### Setting or changing the passphrase
