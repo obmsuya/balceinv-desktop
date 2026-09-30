@@ -1505,6 +1505,73 @@ Desktop: #21 (build check), #22 (support mail secret).
 - Then push the tag. The release workflow builds, signs and publishes
   `latest.json`, and installed apps update themselves.
 
+## Phase 16: cloud deploy behind Cloudflare Tunnel (2026-09-30)
+
+The cloud app and its API run at **https://api-pos.faltasi.com** (one
+origin: the Go server serves the web app and `/api`). The server has no
+public web port of its own; visitors reach it only through Cloudflare.
+
+### Findings fixed
+- Behind the tunnel every request reached the server from the tunnel, so
+  `c.IP()` was the same for everyone and one person's wrong passwords
+  locked all visitors out of signing in
+  (`backend/internal/server/server.go`, `backend/internal/config/config.go`).
+- The app connected to Postgres as the table owner. Migrations now run as
+  `balce_owner` through `MIGRATION_DATABASE_URL`; the app serves as
+  `balce_app` (no BYPASSRLS) (`backend/cmd/server/main.go`).
+- The cloud login page offered "Set up your business", which the cloud
+  refuses; it now shows only on the desktop (`frontend/app/pages/login.vue`).
+
+### Implementation status
+- [x] Owner: domain in Cloudflare, tunnel `balce-server` created, route
+      `api-pos.faltasi.com` → `http://localhost:8080`.
+- [x] `cloudflared` 2026.9.3 from Cloudflare's apt repository, installed as
+      a systemd service with the dashboard token; 4 connections registered.
+- [x] `PROXY_HEADER=CF-Connecting-IP`, `TRUSTED_PROXIES` = the gateway of the
+      `balce_edge` network (the only address the tunnel reaches the API from).
+- [x] `api` service in `deploy/docker-compose.prod.yml`: published on
+      `127.0.0.1:8080` only, image carries `balce-api`, `balce-admin` and the
+      built web app, `balce_edge` gives it outbound access (support email,
+      EFD), logs in the `api_logs` volume, 192 MiB limit.
+- [x] `deploy/deploy.sh`: checks `ALLOWED_ORIGINS`, builds the web app and
+      both binaries, uploads the compose file and image context, backs up,
+      starts the new tag, rolls back if `/health` fails, checks the public
+      URL, keeps the last two images.
+- [x] `deploy/firewall-cloudflare.sh`: ports 80/443 accept only Cloudflare's
+      published ranges (22 ranges); drops ranges Cloudflare no longer lists;
+      monthly cron `/etc/cron.d/balce-cloudflare-firewall`.
+- [x] PRs: balceinv-api #59, balceinv #32.
+
+### Verification performed
+- `go test ./...` with `TEST_DATABASE_URL`: 34 packages pass on SQLite and
+  Postgres. The new visitor-address test fails with the server change
+  removed; a forged header from an untrusted address stays limited.
+- `deploy.sh --dry-run`, then two real deploys: migrations 0 → 52, API uses
+  7.6 MiB; the second deploy recreated only `balce-api`.
+- Through Cloudflare: `/health` 200, `/` and `/login` 200 (web app),
+  `/api/platform` 200, `server: cloudflare`; `/api/setup/status` reports
+  `configured: true` and `POST /api/setup` is refused in the cloud.
+- On the server, `ss` shows tunnel traffic reaching the container from
+  172.31.250.1, the trusted address.
+- Firewall: `https://140.99.254.193`, `http://140.99.254.193` and
+  `:8080` time out from outside; `faltasi.wapangaji.com` still 200 through
+  Cloudflare; a second run of the firewall script changes nothing.
+- Browser: the login page loads at https://api-pos.faltasi.com with no
+  console errors and no setup link.
+
+### Manual follow-up required
+- Add `SUPPORT_SMTP_PASSWORD=<Yahoo app password>` to
+  `/opt/balce/.env.prod` and run `deploy.sh`; until then support messages
+  wait in the database.
+- Create the first cloud company:
+  `docker exec balce-api /balce-admin create-company -business-name "…" -owner-name "…" -owner-email "…"`
+  (it prints a one-time password; the owner must change it at first sign-in).
+- The tunnel token was shared in chat: refresh it in Networking → Tunnels →
+  balce-server, then `cloudflared service uninstall` and install again with
+  the new token.
+- SSH (22) stays open to the internet with password login, by the owner's
+  decision.
+
 ## Manual follow-up required
 _Collected from the phases above as they complete._
 
