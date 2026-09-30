@@ -2083,6 +2083,77 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - On a touch till, check the on-screen keypad in Point of Sale → Pay. It was
   not on screen at the preview width.
 
+## Phase 27: moving a desktop business online (2026-10-01)
+
+### Findings being fixed
+- The desktop app and pos.faltasi.com keep separate data and never sync. A
+  desktop shop that wanted to go online had to start again from nothing.
+- The setup page had no toast area, so its success and error messages never
+  showed. Toast styles were loaded by the layouts, not by the toast component.
+
+### Implementation status
+- [x] Desktop `POST /api/move-to-web/file` (owner only). It builds a `.balce`
+      moving file: a manifest, a `VACUUM INTO` copy of the database, and every
+      logo, product photo and receipt photo
+      (`backend/internal/businessmove/service.go`).
+- [x] Online `POST /api/setup/move-from-desktop`, public, with the signup rate
+      limit (`backend/internal/businessmove/copier.go`):
+  - checks: size limits; refuses a newer schema; migrates the copy; exactly
+    one business, matching the manifest;
+  - copy: one Postgres transaction with the tenant set; tables ordered
+    parents-first from the foreign keys; self-referencing rows ordered;
+    types converted per target column;
+  - skipped: sessions, subscriptions and support messages. The business
+    starts a fresh 14-day trial;
+  - pictures are stored only under the business's own folder;
+  - clear refusals for a second move, an email clash, a newer file and a bad
+    file.
+- [x] The server-wide upload limit went from 8 MB to 65 MB, to fit the moving
+      file.
+- [x] Screens:
+  - desktop: Settings → Backups → **Move this business online**;
+  - online: the setup page card **Already use Balce on a computer?** with an
+    upload dialog and a sign-in hint.
+- [x] Setup now has a toast area, and toast styles load with the toast
+      component.
+- [x] Team guide `docs/team/moving-online.md`, covering both "does my data
+      follow me?" and the move steps.
+- [x] PRs: balceinv-api #69, balceinv #44.
+
+### Verification performed
+- `go vet ./...` and `go test ./...` pass on SQLite and Postgres. The new
+  end-to-end test builds a real desktop business (variants, logo, product
+  photo, cash and credit sales, books with a reversal, a cashier), moves it
+  into a Postgres server, and checks:
+  - every tenant table has the same row count;
+  - the owner and cashier sign in with their desktop passwords;
+  - the logo is served online;
+  - the sales summary and money figures match;
+  - the business is on a 14-day trial, and a new sale works afterwards;
+  - moving twice, an email clash (nothing left behind) and junk files are
+    refused;
+  - a cashier cannot download the file.
+
+  A unit test covers the picture-folder rule.
+- Desktop-mode server plus web preview:
+  - the seeded business (logo, product photo, 2 products, 3 sales) was saved
+    to a moving file, which contained the database, the logo and the photo;
+  - importing through the setup dialog worked, and signing in with the
+    desktop password showed Mchele stock 114, 3 sales, TSh 21,000 and a
+    14-day trial;
+  - a second move showed "Biashara hii tayari iko mtandaoni. Ingia badala
+    yake." as a toast;
+  - the failed first attempt (the preview had no picture storage) left no
+    rows behind.
+
+### Manual follow-up required
+- The desktop button ships in the next desktop release (v2.0.2). Until then
+  shops cannot make a moving file.
+- Move one real shop together with the owner, and check products, stock and
+  today's sales online before they stop using the computer.
+- Paid days on the desktop do not move. Add any remaining days to the new
+  Subscription ID with the sales tool.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
