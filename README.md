@@ -93,6 +93,9 @@ Step-by-step guides for the sales and support team, written for non-technical st
 
 * [Creating a business](docs/team/create-a-business.md): at the shop with the desktop app, at the shop online, or the customer alone at pos.faltasi.com.
 * [Loading common products (the catalog)](docs/team/common-products.md): preparing the Excel file, opening the team screen, uploading, and checking the list.
+* [Subscriptions and activation](docs/team/subscriptions.md): the free trial, the 5-day grace period, what a locked POS looks like, and activating with the sales tool.
+* [Recording expenses](docs/team/recording-expenses.md): switching the books on, starting them, and recording money out.
+* [The whole handbook](docs/team/README.md): every guide, and the ones planned next.
 
 ---
 

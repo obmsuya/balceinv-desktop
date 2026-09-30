@@ -1,0 +1,53 @@
+# Balce team handbook
+
+Guides for the Balce sales and support team: how to set a shop up, how to answer customers, and what to do when something goes wrong. No technical knowledge needed. Button names are written as **English (Kiswahili)**.
+
+## Ready
+
+| Guide | Covers |
+| :--- | :--- |
+| [Creating a business](create-a-business.md) | Setting up a shop with the desktop app, online, or the customer alone |
+| [Loading common products](common-products.md) | Preparing and uploading the product catalog |
+| [Subscriptions and activation](subscriptions.md) | Free trial, grace period, locking, paying in the POS, activating with the sales tool |
+| [Recording expenses](recording-expenses.md) | Switching the books on, starting them, and recording money out |
+
+## Planned
+
+Written in this order, most-asked first. Each guide follows the same shape: the short answer, then numbered steps, then common questions.
+
+**1. Setting up a shop**
+- Users and roles: adding cashiers, what each role allows, resetting a password.
+- Printers, scanners and the cash drawer: plugging in, testing, what to do when nothing prints.
+- Extra tills on the shop network: connecting a second computer or tablet to the main one.
+- Branches: adding a shop, receipt prefixes, sending stock between shops.
+- Moving from the old Balce: importing old data.
+
+**2. Daily work**
+- Selling at the till: search and scan, several carts, payment methods, discounts.
+- Voiding a sale and printing a receipt again.
+- Stock: stock arrived, changing stock with a reason, stock counts.
+- Customers and credit (madeni): selling on credit, taking payments, reminders, statements.
+- Orders and deposits.
+- Suppliers: deliveries, paying suppliers, supplier statements.
+
+**3. Money and reports**
+- Reading the reports: which report answers which question, and printing or sending them.
+- Month end with an accountant: closing a month, the trial balance, the VAT return.
+
+**4. When something goes wrong** (one page of questions and answers, growing over time)
+- The POS is locked, or says the date is wrong.
+- Cannot sign in, or forgot the password.
+- The printer does not print.
+- Backups: where they are and how to restore one.
+- Updates: how the desktop app updates itself.
+
+**5. For our team only**
+- The admin tool: creating a cloud business from the command line.
+- The sales tool (Faltasi Control Centre): signing in, activating, payment history.
+
+## How we keep it useful
+
+- **Asked twice, write it once.** When the same question comes in twice, add the answer to the right guide, or to the questions page in section 4.
+- **Screens change, guides follow.** Any change to a screen that a guide describes updates the guide in the same pull request.
+- **Plain words.** Short sentences, one action per step, the exact button name in both languages.
+- **Where it lives.** These files, in this folder, linked from the main README. When the list grows, they can be published as a help site and linked from the app's account menu.
