@@ -1710,6 +1710,84 @@ before the pattern is copied.
 - Step 3: Reports as one list for every report, all with the same design.
 - Step 4: Money as a recording page with one transactions table.
 
+## Phase 20: VAT only for VAT-registered businesses (2026-09-30)
+
+### Finding fixed
+- The till took the settings tax rate (18% by default) out of every price even
+  when the business was not VAT registered, so the sales report's gross profit
+  (TSh 66,015 in the preview) disagreed with the books (TSh 104,150)
+  (`backend/internal/sales/service.go`).
+
+### Implementation status
+- [x] Quotes, sales and customer orders use the tax rate only when VAT
+      registration is on (`saleTaxRate`), the rule purchases already followed.
+- [x] Settings → System explains under the tax rate whether the till charges it.
+- [x] PRs: balceinv-api #63, balceinv #36.
+
+### Verification performed
+- The three tests that check VAT maths now register their business for VAT; a
+  new check confirms an unregistered business is quoted 0% and TSh 0 VAT.
+- `go test ./...`: 34 packages pass on SQLite and Postgres.
+
+### Manual follow-up required
+- Sales already made by an unregistered business keep the VAT they were
+  recorded with, so older sales reports still show it; new sales are correct.
+
+## Phase 21: accounting reports, step 2 — every statement (2026-09-30)
+
+### Implementation status
+- [x] Shared sheet helper for the Excel letterhead, notes, sign-off and print
+      setup (`backend/internal/documents/excel_sheet.go`); single-column
+      statements; notes kept with the sign-off.
+- [x] Register layout (`backend/internal/documents/register*.go`): opening
+      balance, running balance, totals, double-ruled closing balance, summary
+      strip, wrapped headings, header on every page; in Excel every running
+      balance and total is a formula, with header filters. Wrong balances are
+      refused.
+- [x] Balance sheet compared with the start of the period; money summary;
+      trial balance; account statement / cash book with the other side of each
+      entry; VAT return (`backend/internal/accounting/books_documents.go`).
+- [x] Customer and supplier statements as PDF and Excel
+      (`backend/internal/customers/statement_document.go`,
+      `backend/internal/suppliers/statement_document.go`).
+- [x] Reports → Books lists every statement (`frontend/app/components/reports/BooksPanel.vue`);
+      customer and supplier pages preview and download their statements.
+- [x] The preview frees the pdf.js worker (loading task destroyed).
+- [x] PRs: balceinv-api #64, balceinv #37.
+
+### Verification performed
+- `go test ./...`: 34 packages pass on SQLite and Postgres. Excel totals
+  recalculated against the ledger and the API for:
+  - the balance sheet (both sides equal the total assets);
+  - the trial balance (debits equal credits);
+  - the cash book (the running balance reaches the closing balance);
+  - the VAT return, the money summary (net worth), and the customer
+    (TSh 10,000) and supplier (TSh 17,000) statements.
+- Sample documents read page by page in English and Kiswahili. Figures checked
+  by hand:
+  - trial balance 9,755,300 on both sides; balance sheet 7,793,840;
+  - money in 1,377,600 = 115,640 + 139,240 + 122,720 + 1,000,000;
+  - customer 21,240 − 5,000 = 16,240; supplier 360,000 − 150,000 = 210,000.
+- Found and fixed while reading the samples:
+  - a cut-off totals label;
+  - the "Amount" heading repeated on the money summary;
+  - the sign-off stranded on a page of its own;
+  - cut-off column headings;
+  - payment references shown as raw codes;
+  - "Profit to date" out of line with the account names;
+  - cash book lines that only said "Money out".
+- Local cloud preview (full books, VAT, supplier, credit customer):
+  - Books lists all six statements.
+  - The Bank statement, customer (TSh 12,700) and supplier (TSh 80,000)
+    previews rendered.
+  - Opening and closing the preview raised no errors.
+  - At 375 px there is no sideways scroll.
+
+### Next steps
+- Step 3: Reports as one list for every report (sales and stock too), all in
+  the same document design.
+- Step 4: Money as a recording page with one transactions table.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
