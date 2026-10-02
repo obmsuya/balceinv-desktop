@@ -2154,6 +2154,87 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - Paid days on the desktop do not move. Add any remaining days to the new
   Subscription ID with the sales tool.
 
+## Phase 28: Windows desktop sign-in (2026-10-01, v2.0.2)
+
+### Findings being fixed
+- Every v2.0.0 and v2.0.1 Windows install showed "Can't reach Balce" on sign-in.
+  Since 29 Sep the sign-in request sends `X-Balce-Client: desktop`, but the CORS
+  allowed headers never listed it. The webview's preflight was refused, so the
+  sign-in POST never left the screen (`backend/internal/server/server.go`).
+- A v1 server left running after a crash survived the v2 install: it kept
+  port 8080 and its `backend.exe` was not replaced. The NSIS pre-install hook
+  matched on `Process.Path`, which 32-bit PowerShell (the installer's) reads as
+  empty for a 64-bit process (`src-tauri/windows/hooks.nsh`).
+
+### Implementation status
+- [x] `httpx.DesktopClientHeader` is shared by the auth handler and the CORS
+      allowed headers.
+- [x] The hook matches `Win32_Process.ExecutablePath` and stops by process id.
+- [x] PRs: balceinv-api #70, balceinv-desktop #38. Released as v2.0.2.
+
+### Verification performed
+- On a GitHub Windows runner with the published v2.0.1 installer, the preflight
+  to `/api/auth/login` returned allowed headers without `X-Balce-Client`.
+- `TestDesktopScreenMayCallTheApiFromEveryWebviewOrigin` fails on the old code
+  and passes now. The full suite passes on SQLite and Postgres.
+- From 32-bit PowerShell with a leftover v1.0.19 server: the shipped hook left
+  1 server running, the fixed hook left 0.
+- Two shop computers' logs matched: one showed `OPTIONS /api/auth/login` 204
+  with no POST after it, the other had an old server on 8080 and no v2 log.
+
+### Manual follow-up required
+- Install v2.0.2 on a Windows shop computer that still runs v1 and confirm
+  sign-in works without a restart.
+
+## Phase 29: tester reports on receipts, printing and products (2026-10-02, v2.0.3)
+
+### Findings being fixed
+- Desktop POS "no way to print": the Print button falls back to `window.open`
+  when no receipt printer is set up, and the desktop app ignores it
+  (`frontend/app/composables/usePrint.ts`). The printer status was also read
+  once per session.
+- Web receipts: no PDF download on the screen after a sale, and no Share
+  anywhere.
+- Web "no way to delete a product": it exists as Archive ("Weka kando") in the
+  row menu.
+- Desktop "subscribing fails": no cause visible in code. The log did not
+  record what the payment server answered.
+- Not fixed, not current: the sales-import template and the export button
+  were v1 bugs (`window.open` and an empty export function). v2 has no sales
+  template, and report export uses the native save dialog.
+
+### Implementation status
+- [x] `openBrowserReceipt` opens a `WebviewWindow` on Tauri. Receipt windows
+      (`receipt-*`) get the app permissions
+      (`src-tauri/capabilities/default.json`). The printer status is re-read
+      on every print.
+- [x] `useSales.shareSaleReceipt` and a `kind` for `downloadSaleDocument`.
+      Share and Receipt (PDF) buttons on the POS completion dialog and the
+      sale details dialog.
+- [x] Archive is called Delete / Futa. Glossary updated.
+- [x] The licensing proxy logs each payment server reply (status, duration,
+      reason) and each activation failure.
+- [x] PRs: balceinv-api #71, balceinv #45.
+
+### Verification performed
+- `go test ./internal/licensing/ ./internal/server/`, `node
+  scripts/locales.check.ts`, `pnpm generate`.
+- Web preview on a scratch Postgres database:
+  - Receipt (PDF) fetched `kind=receipt` (200) and showed the saved toast;
+  - Share with a stubbed share API passed a 41 KB `application/pdf` file, and
+    without the API it saved the file with the attach hint;
+  - sales history shows Share, Receipt (PDF), A4 invoice and Print;
+  - the product menu shows Futa.
+
+### Manual follow-up required
+- On a Windows and a Mac desktop with no receipt printer: make a sale, press
+  Print receipt, and check that a receipt window opens and the print dialog
+  appears. The Tauri window path cannot be checked in the browser preview.
+- On a phone browser: press Share after a sale and check WhatsApp is offered
+  with the PDF attached.
+- After a failed desktop payment, run the PowerShell log command from the team
+  and read the `licensing server responded` line for the reason.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
