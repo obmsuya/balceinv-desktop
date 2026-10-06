@@ -2281,6 +2281,30 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - Tell owners the button is off for staff until they tick "Give discounts at
   the till" in Roles.
 
+## Phase 31: no limit on cashier discounts (2026-10-06)
+
+### Findings being fixed
+- The owner does not want a cap: anyone allowed to give discounts may take up
+  to the full price.
+
+### Implementation status
+- [x] Removed the limit check, the `till_discount_over_limit` error, the limit
+      in till options and the Settings field. Migration 000056 drops
+      `settings.till_discount_limit_basis_points`.
+- [x] The till's discount box no longer shows or enforces a limit.
+- [x] Team guide updated.
+- [x] PRs: balceinv-api #73, balceinv #47.
+
+### Verification performed
+- `go vet ./...`, `go test ./...` on SQLite and Postgres. The end-to-end test
+  gives 100% on one line as a permitted cashier.
+- `pnpm generate`, locale check.
+- Web preview: a permitted cashier set 100% ("Takes TSh 20,000 off this
+  line"), Pay showed TSh 0, and the sale completed.
+
+### Manual follow-up required
+- None beyond Phase 30.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
