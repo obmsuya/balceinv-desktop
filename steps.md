@@ -2235,6 +2235,52 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - After a failed desktop payment, run the PowerShell log command from the team
   and read the `licensing server responded` line for the reason.
 
+## Phase 30: cashier discount at the till (2026-10-06, v2.0.4)
+
+### Findings being fixed
+- The 29 Sep till rebuild (frontend `9e6195a`) removed the per-line "% off"
+  box. It worked only because the server trusted prices sent by the screen,
+  so any cashier could sell at any price with no record. Phase 5 listed it as
+  "left out on purpose, add when asked", but the owner was never told.
+
+### Implementation status
+- [x] Migration 000055:
+  - `sale_items.manual_discount_amount`;
+  - `settings.till_discount_limit_basis_points` (default 10000);
+  - permission `till_discounts:create`. It is granted to no role; owners
+    tick it in Roles.
+- [x] Server pricing: percent (basis points) or amount per line, on top of
+      the automatic discount, capped at the line. 403
+      `till_discount_not_allowed`; 422 `till_discount_over_limit` (the owner
+      has no limit) (`backend/internal/sales/pricing.go`, `service.go`).
+- [x] Receipts (PDF and thermal) show the automatic and cashier discounts as
+      separate rows.
+- [x] Till: a Discount / Punguzo button per line with a percent or amount box
+      that warns above the limit (`frontend/app/components/pos/LineDiscountPopover.vue`).
+- [x] The owner's limit in Settings → Hardware. The permission label in
+      Roles. The receipt page and sales history show the cashier discount.
+- [x] Team guide `docs/team/till-discounts.md`.
+- [x] PRs: balceinv-api #72, balceinv #46.
+
+### Verification performed
+- `go vet ./...`, `go test ./...` on SQLite and Postgres. The new pricing
+  test and the end-to-end test cover the permission, the limit, saved lines
+  and the owner without a limit.
+- `node scripts/locales.check.ts`, `pnpm generate`.
+- Web preview with a cashier holding the permission and a 10% limit:
+  - 15% was blocked in the box;
+  - 10% gave server totals of −2,000 and 18,000;
+  - the sale saved the cashier discount;
+  - the receipt showed "Cashier discount −TSh 2,000";
+  - the limit saved 12.5% as 1250;
+  - Roles listed the permission.
+
+### Manual follow-up required
+- On a touch till, open the Discount box on a cart line and check it is easy
+  to use with fingers and does not cover the Pay button.
+- Tell owners the button is off for staff until they tick "Give discounts at
+  the till" in Roles.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
