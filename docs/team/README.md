@@ -13,6 +13,7 @@ Guides for the Balce sales and support team: how to set a shop up, how to answer
 | [How subscription payments work](how-payments-work.md) | What happens between the POS, Wapangaji and mobile money, step by step, and where it gets stuck |
 | [The sales tool](sales-tool.md) | Getting the FALTASI POS Control Centre, signing in, activating, searching, payment history and plans |
 | [Desktop or online, and moving a shop online](moving-online.md) | Why data does not follow a shop between the desktop app and pos.faltasi.com, and how to move a desktop shop online with everything |
+| [Discounts at the till](till-discounts.md) | Planned discounts, cashier discounts, who may give them and the owner's limit |
 
 ## Planned
 
