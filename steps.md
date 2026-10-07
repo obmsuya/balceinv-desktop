@@ -2305,6 +2305,61 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 ### Manual follow-up required
 - None beyond Phase 30.
 
+## Phase 32: void a sale, linked money records, tester answers (2026-10-07, v2.0.5)
+
+### Findings being fixed
+- A confirmed sale could not be corrected: there was no void, refund or edit.
+- In simple books the Money page listed only hand-typed records, while the
+  balances included sales and purchases, so money looked unlinked.
+- Salaries could not say who was paid. A note was the only option.
+- Credit at the till was labelled "Lipa baadaye" and only appears after a
+  customer is added, so testers thought it was missing. Open tills kept old
+  settings until a reload.
+- On phones the held carts were hidden behind the cart bar.
+- The menu showed a shortened ID that people retyped into the sales tool.
+- Found to be the old v1 app, not v2: the sales import template.
+
+### Implementation status
+- [x] Migration 000057: sale void columns and `fiscal_credit_notes`.
+      `POST /api/sales/:id/void` (`sales:delete`, reason required) puts stock
+      back, reverses the sale entry, and queues an EFD credit note when the
+      receipt was sent (drops it when never sent; refuses while sending).
+      Voided sales are left out of totals, reports, customer debt and
+      catch-up.
+- [x] Migration 000058: `journal_entries.paid_to_user_id`. Money out takes
+      Paid to; `GET /api/accounting/people`. Entries return the party name and
+      who was paid.
+- [x] Screens:
+  - Void sale in sales history;
+  - Money → Show → Everything in all modes, with names and source links;
+  - Paid to (required for Salaries);
+  - Mkopo wording and the add-customer hint;
+  - settings re-read on focus;
+  - the phone cart bar;
+  - click-to-copy ID.
+- [x] Team guides: `where-is-it.md` (new), `recording-expenses.md`,
+      `subscriptions.md`, `sales-tool.md`.
+- [x] PRs: balceinv-api #74, balceinv #48.
+
+### Verification performed
+- `go vet ./...`, `go test ./...` on SQLite and Postgres. New tests cover
+  voiding (with and without an EFD receipt) and paid-to with party names.
+- `node scripts/locales.check.ts`, `pnpm generate`.
+- Web preview with books on:
+  - voiding a sale of 4 showed the banner, set sales to 0 and put the stock
+    back to 30;
+  - Money → Everything listed the sale, the cancellation and the stock
+    change, with a link to the receipt;
+  - a salary saved as "Paid to Check Owner";
+  - the payment box showed the credit hint;
+  - the phone bar read "Cart 1 · 1 item".
+
+### Manual follow-up required
+- With a real EFD provider: void a sale whose receipt was accepted and check
+  the provider accepts the credit note (document_type `credit_note`,
+  original receipt number and reason).
+- Ask testers to retest on v2.0.5 using `docs/team/where-is-it.md`.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.

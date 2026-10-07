@@ -14,6 +14,7 @@ Guides for the Balce sales and support team: how to set a shop up, how to answer
 | [The sales tool](sales-tool.md) | Getting the FALTASI POS Control Centre, signing in, activating, searching, payment history and plans |
 | [Desktop or online, and moving a shop online](moving-online.md) | Why data does not follow a shop between the desktop app and pos.faltasi.com, and how to move a desktop shop online with everything |
 | [Discounts at the till](till-discounts.md) | Planned discounts, cashier discounts and who may give them |
+| [Where is it?](where-is-it.md) | Quick answers to what testers asked: voiding a sale, held carts, discounts, credit, the Money page, salaries, copying the ID |
 
 ## Planned
 

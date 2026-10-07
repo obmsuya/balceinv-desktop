@@ -95,7 +95,7 @@ This works from version v.1.0.2 onwards. If you have v.1.0.0 or v.1.0.1, downloa
 - **Hardware ID (Kitambulisho cha kifaa)** on the desktop app, or
 - **Subscription ID (Kitambulisho cha usajili)** online.
 
-Clicking it copies the whole ID. Ask the shop to paste it to you on WhatsApp or SMS. Never type it by hand from the screen, because the screen shows only the start of it.
+Clicking it copies the whole ID (the menu says **Click to copy the full ID**). Ask the shop to paste it to you on WhatsApp or SMS. Never type it by hand. A web shop's ID looks like `cloud-` followed by 36 letters, numbers and dashes.
 
 Then, in the tool:
 
