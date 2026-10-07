@@ -1,0 +1,17 @@
+# Where is it? Answers to what testers asked
+
+A guide for the Balce sales and support team. No technical knowledge needed. Button names are written as **English (Kiswahili)**. "Desktop" means the app on a computer; "online" means pos.faltasi.com.
+
+**First check the version.** Many reports come from the old desktop app (version 1). Account menu → Settings → Updates shows the version. Anything below **2.0** must be updated before testing.
+
+| Question | Answer |
+| :--- | :--- |
+| "The sales import template doesn't download" | Only the old app (version 1) had a sales import. Version 2 has none. Update the app. Products still have **Template (Kiolezo)** on the **Products (Bidhaa)** page. |
+| "I can't correct a sale after confirming it" | **Sales history (Historia ya Mauzo)** → open the sale → **Void sale (Batilisha mauzo)**, give a reason. Stock goes back, the books are reversed and any debt on it is removed. Then sell it again correctly. If the EFD already has the receipt, a **credit note (hati ya kufuta)** is sent to it. Needs the **Void sales (Kubatilisha mauzo)** permission; owners always have it. Sales that completed a customer order are changed through the order. |
+| "I can't pause a sale to serve someone else" | The till has three carts: **Cart 1 / 2 / 3 (Kikapu 1 / 2 / 3)** at the top of the cart. Switch to another cart; the first one stays as it was. On a phone, tap the cart bar at the bottom first; it shows which cart is open and how many others are waiting. |
+| "There is no discount at the till" | Two kinds: planned discounts on the **Discounts (Punguzo)** page apply by themselves, and the **Discount (Punguzo)** button on each cart line for an on-the-spot discount. Staff see that button only after the owner ticks **Give discounts at the till (Kutoa punguzo kaunta)** in **Roles (Majukumu)**. See [Discounts at the till](till-discounts.md). |
+| "The sales tool refuses the customer's ID" | Copy the ID with a click (account menu → **Click to copy the full ID**) and paste it whole into sales tool **v.1.0.3** or newer. Never type the ID from the screen. See [The sales tool](sales-tool.md). |
+| "Credit sales are on but don't show" | 1. **Settings → Features**: turn on **Customers (Wateja)**, then **Sell on credit (Kuuza kwa mkopo)**, and press **Save changes (Hifadhi mabadiliko)**. 2. At the till, press **Add customer (Ongeza mteja)** and pick the customer. 3. Press pay: the **On credit (Mkopo)** line now appears. Without a customer it stays hidden, and the payment box says so. |
+| "Money isn't linked to sales and purchases" | Sales, stock arrived and payments go into the books by themselves. On **Money (Fedha)**, set **Show (Onyesha)** to **Everything (Kila kitu)** to see them next to what was typed by hand. Open one to see the customer or supplier and a link to it. Never type purchases or supplier payments in Money out. See [Recording expenses](recording-expenses.md). |
+| "Payroll doesn't show who was paid" | **Money (Fedha)** → **Money out** → **Salaries**, then choose **Who was paid (Nani amelipwa)** from the staff list. The record shows **Paid to {name}**. There is no separate payroll (payslips, deductions). |
+| "I changed a setting but the till didn't change" | Open tills pick up changes when they are clicked again after a minute, or right away after reloading the page (desktop: close and open Balce). |

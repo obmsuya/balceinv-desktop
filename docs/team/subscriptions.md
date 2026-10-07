@@ -54,7 +54,7 @@ How to get the tool and every screen in it: [The sales tool](sales-tool.md). Wha
 Use this when the customer pays you in cash, by bank transfer, or to your number.
 
 1. On the customer's screen, open the account menu (the initials at the top right) and click **Hardware ID (Kitambulisho cha kifaa)** on the desktop, or **Subscription ID (Kitambulisho cha usajili)** online. This **copies the full ID**. Send it to yourself (WhatsApp or SMS).
-   - **Always use the copy.** The screen only shows the first few characters. The sales tool (version v.1.0.3 or newer) refuses anything that is not a full ID.
+   - **Always use the copy.** The menu says **Click to copy the full ID (Bonyeza kunakili kitambulisho kamili)**; the full ID is 64 characters on the desktop, or `cloud-` plus 36 characters online. The sales tool (version v.1.0.3 or newer) refuses anything shorter. If copying fails, a message shows the full ID to select and copy by hand.
 2. In the sales tool, choose **Activate / Renew**, paste the full Device ID, pick the plan, and record the payment (amount, method, reference).
 3. The licence is created on our server straight away. When the computer picks it up depends on its state:
 
