@@ -14,6 +14,7 @@ Guides for the Balce sales and support team: how to set a shop up, how to answer
 | [The sales tool](sales-tool.md) | Getting the FALTASI POS Control Centre, signing in, activating, searching, payment history and plans |
 | [Desktop or online, and moving a shop online](moving-online.md) | Why data does not follow a shop between the desktop app and pos.faltasi.com, and how to move a desktop shop online with everything |
 | [Discounts at the till](till-discounts.md) | Planned discounts, cashier discounts and who may give them |
+| [Features: what changed and why](../features/README.md) | Each feature from 1 to 8 October with screenshots: why it was added, what was removed, how it works. Voiding a sale and refunds are explained there |
 | [Where is it?](where-is-it.md) | Quick answers to what testers asked: voiding a sale, held carts, discounts, credit, the Money page, salaries, copying the ID |
 
 ## Planned
@@ -29,7 +30,7 @@ Written in this order, most-asked first. Each guide follows the same shape: the 
 
 **2. Daily work**
 - Selling at the till: search and scan, several carts, payment methods, discounts.
-- Voiding a sale and printing a receipt again.
+- Printing a receipt again.
 - Stock: stock arrived, changing stock with a reason, stock counts.
 - Customers and credit (madeni): selling on credit, taking payments, reminders, statements.
 - Orders and deposits.
