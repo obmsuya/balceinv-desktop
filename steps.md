@@ -2404,6 +2404,64 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - With a real EFD provider, refund part of a sale whose receipt was accepted
   and check the provider accepts the refund note.
 
+## Phase 34: feature pages, screenshots and the bugs found writing them (2026-10-09)
+
+### Findings being fixed
+- No single place explained each recent feature, why it came, what was
+  removed and how it works. `docs/team/README.md` still listed voiding a sale
+  as planned.
+- A refund's entry on Money linked to `/receipts/<refund id>`, which does not
+  exist (`frontend/app/components/money/EntryDetailsDialog.vue`).
+- A refund to the customer's account was capped by the sale's credit only,
+  so after the customer paid the debt it could leave them owed money
+  (`backend/internal/sales/refund.go`).
+- Bulk delete counted products ticked on every page but sent only the
+  current page's (`frontend/app/pages/products/index.vue`).
+- "Paid to is required for salaries" was checked by the screen only
+  (`backend/internal/accounting/service.go`).
+- EFD credit notes for a void and for a refund looked the same
+  (`backend/internal/sales/fiscal.go`).
+
+### Implementation status
+- [x] `docs/features/`: README with release history, and pages for the
+      Windows sign-in fix, cashier discounts, void, refunds, product delete,
+      Money and the books, till and receipts; 16 screenshots from a local web
+      preview with test data.
+- [x] Entries carry `source_sale_id` (the sale for sales, voids and refunds);
+      the Money link uses it.
+- [x] A refund to the account is also capped by the customer's current
+      balance (`customers.Service.Balance`).
+- [x] The products page keeps the ticked products themselves across pages.
+- [x] A salary without `paid_to_user_id` gets 400 `paid_to_required`, with an
+      English and Kiswahili message.
+- [x] EFD credit notes carry `credit_for`: `void` or `refund`.
+- [x] Team handbook links the feature pages; "Voiding a sale" removed from
+      Planned.
+- [x] PRs: balceinv-api #76, #77, #78; balceinv #50, #51, #52.
+- [ ] Admin panel: paused. Started on a local branch, not pushed (see the
+      session report).
+
+### Verification performed
+- Backend, on each branch: `go vet ./...` and `go test ./...` on SQLite and
+  Postgres. New checks: refund entries return the sale as `source_sale_id`;
+  a refund to the account after the customer paid is refused with
+  `refund_credit_not_possible`; a salary with no Paid to is refused with
+  `paid_to_required`; void and refund credit notes carry `credit_for`.
+- Frontend: `pnpm build`, `pnpm generate`, `node scripts/locales.check.ts`.
+  (`nuxi typecheck` cannot run here: the vue-tsc it fetches does not match
+  the installed TypeScript; it is not part of the build.)
+- Web preview with all six branches built in (local Postgres, test data):
+  - a refund's entry on Money showed "Open the receipt →" to
+    `/receipts/<sale id>` and opened SALE-20261008-0001;
+  - Money out for Salaries with no Paid to returned 400 `paid_to_required`;
+  - with 52 products (two pages), ticking one on page 1 and a sold one on
+    page 2 and deleting gave "1 deleted, 1 kept" and 51 products.
+
+### Manual follow-up required
+- Desktop shops get these fixes in the next desktop version after v2.0.6.
+- With a real EFD provider, check it accepts (or ignores) the new
+  `credit_for` field.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
