@@ -2360,6 +2360,50 @@ POS_MASTER and wapangaji were read on 2026-09-30.
   original receipt number and reason).
 - Ask testers to retest on v2.0.5 using `docs/team/where-is-it.md`.
 
+## Phase 33: permanent product delete and refunds (2026-10-08)
+
+### Findings being fixed
+- Products could only be archived. Products made by mistake stayed forever.
+- Mistakes found after a sale could only be fixed by voiding the whole sale.
+  There was no partial return.
+
+### Implementation status
+- [x] `POST /api/products/delete` deletes one or many products with their
+      variants when they never appear on a sale (including voided), purchase,
+      purchase order, supplier return, customer order or transfer. Opening
+      stock in the books is reversed first. Used products are skipped with a
+      reason. Products page: tick boxes, bulk bar, "Delete permanently";
+      archive is called Archive / Weka kando again.
+- [x] Migration 000059: `sale_refunds`, `sale_refund_lines`,
+      `fiscal_refund_notes`. `POST /api/sales/:id/refunds` (`sales:edit`)
+      refunds quantities per line by cash, card, mobile or off the customer's
+      debt, optionally restocking. It reverses money, sales and VAT (and
+      restocked cost) in the books under the existing `sale_void` source type,
+      because the SQLite source-type check cannot be changed safely. Customer
+      debt, sales totals and the summary subtract refunds. An EFD refund note
+      is sent after the original receipt is accepted.
+- [x] Sales history: Refund panel and refund history on the sale; Takings
+      card shows refunds.
+- [x] `docs/team/where-is-it.md` updated.
+- [x] PRs: balceinv-api #75, balceinv #49.
+
+### Verification performed
+- `go vet ./...`, `go test ./...` on SQLite and Postgres. New tests cover
+  delete (unused, sold, variants, other business, books, permission) and
+  refunds (partial and rest, retry, stock, limits, credit, debt, void
+  blocked, voided refused, totals, summary, EFD refund note).
+- `node scripts/locales.check.ts`, `pnpm generate`.
+- Web preview:
+  - deleting 3 products with one sold gave "2 deleted, 1 kept";
+  - refunding 1 of 3 showed the refund on the sale, put stock from 17 back to
+    18, and the Takings card showed the refunds.
+
+### Manual follow-up required
+- Refunds recorded while the books are off are not caught up later; start
+  the books before taking refunds if they should appear there.
+- With a real EFD provider, refund part of a sale whose receipt was accepted
+  and check the provider accepts the refund note.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
