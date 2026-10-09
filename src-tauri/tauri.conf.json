@@ -30,6 +30,8 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "Faltasi",
+    "copyright": "© 2026 Faltasi",
     "createUpdaterArtifacts": true,
     "externalBin": [
       "bin/backend"
