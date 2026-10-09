@@ -2458,7 +2458,7 @@ POS_MASTER and wapangaji were read on 2026-09-30.
     page 2 and deleting gave "1 deleted, 1 kept" and 51 products.
 
 ### Manual follow-up required
-- Desktop shops get these fixes in the next desktop version after v2.0.6.
+- Desktop shops get these fixes in v2.0.7.
 - With a real EFD provider, check it accepts (or ignores) the new
   `credit_for` field.
 
