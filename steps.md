@@ -2462,6 +2462,46 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - With a real EFD provider, check it accepts (or ignores) the new
   `credit_for` field.
 
+## Phase 35: Faltasi branding, v2.0.7 (2026-10-09)
+
+### Findings being fixed
+- Nothing in the app named Faltasi as the maker: not the start screen, the
+  sign-in, receipts, documents or the installer.
+
+### Implementation status
+- [x] Start screen "by FALTASI"; sign-in and setup wordmark "by FALTASI" and
+      "© Faltasi · POS & Inventory"; footer "Made by Faltasi" beside Support;
+      Settings → Updates "Balce Inventory · Made by Faltasi"
+      (`frontend/app/pages/index.vue`, `login.vue`, `setup.vue`,
+      `components/AppFooter.vue`, `pages/settings/index.vue`).
+- [x] Customer display idle footer and browser receipt:
+      "Faltasi POS · pos.faltasi.com" (`pages/display/index.vue`,
+      `pages/receipts/[id].vue`).
+- [x] Printed receipt last line `Faltasi POS - pos.faltasi.com`
+      (`backend/internal/printing/receipt.go`); PDF page footer, PDF and
+      Excel creator, Excel page footer (`backend/internal/documents`).
+- [x] Installer publisher and copyright (`src-tauri/tauri.conf.json`).
+- [x] `docs/features/faltasi-branding.md` with six screenshots.
+- [x] PRs: balceinv #53, balceinv-api #79; fixes from phase 34 merged
+      (balceinv-api #76, #77, #78; balceinv #50, #51, #52).
+
+### Verification performed
+- Backend on merged `revamp`: `go vet ./...`, `go test ./...` on SQLite and
+  Postgres; receipt and document tests check the new text and creator.
+- Frontend on merged `revamp`: `pnpm build`, `pnpm generate`,
+  `node scripts/locales.check.ts`.
+- Local web preview: start screen, sign-in, footer, customer display and
+  browser receipt checked by screenshot; the receipt PDF rendered with the
+  new page footer and creator "Faltasi POS".
+- `publisher` and `copyright` confirmed as `BundleConfig` fields in
+  tauri-utils 2.9.3.
+
+### Manual follow-up required
+- After installing v2.0.7 on Windows, check **Settings → Apps** lists the
+  publisher as Faltasi.
+- Print one receipt on a 58 mm and an 80 mm printer and check the last line
+  prints in full.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
