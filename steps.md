@@ -2502,6 +2502,64 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - Print one receipt on a 58 mm and an 80 mm printer and check the last line
   prints in full.
 
+## Phase 36: owner requests, v2.0.8 (2026-10-10)
+
+### Findings being fixed
+- Opening stock went silently into the top-bar shop; the product form never
+  named it (`frontend/app/components/products/ProductFormDialog.vue`,
+  `backend/internal/products/service.go`).
+- No way to delete a shop made by mistake (`backend/internal/shops`,
+  `frontend/app/pages/shops/index.vue`).
+- Starting capital was only reachable by finding Cash flow after switching
+  the books on (`frontend/app/components/settings/FeaturesPanel.vue`).
+- The owner wants "Money" called "Cash flow" (`frontend/app/locales`).
+- Faltasi was not in the top bar or the browser tab
+  (`frontend/app/components/AppHeader.vue`, `plugins/01.brand.client.ts`,
+  `layouts/default.vue`, `src-tauri/tauri.conf.json`).
+- Found while testing: Close shop, Stop discount and removing a customer did
+  nothing. The confirm dialogs cleared their target on close before the
+  confirm handler ran (`pages/shops/index.vue`, `pages/discounts/index.vue`,
+  `components/customers/CustomerStatusDialog.vue`).
+
+### Implementation status
+- [x] `shop_id` on product create, checked against open shops the user works
+      in; Shop for this stock picker.
+- [x] `POST /api/shops/:id/delete` for never-used shops; Delete permanently on
+      the Shops page.
+- [x] Turning the books on goes to Cash flow → Start your books; money step
+      says "Your starting capital".
+- [x] Money → Cash flow / Mzunguko wa fedha in menu, title, tour, errors and
+      docs.
+- [x] FALTASI POS under the business name; "{page} · Faltasi POS" tab titles;
+      desktop window title "Faltasi POS".
+- [x] The three dialogs keep their target until the action is done.
+- [x] `docs/features/owner-requests-v2-0-8.md` with screenshots.
+- [x] PRs: balceinv-api #80, #81; balceinv #54–#59.
+
+### Verification performed
+- Backend on merged `revamp`: `go vet ./...`, `go test ./...` on SQLite and
+  Postgres; new tests `TestOpeningStockGoesToTheChosenShop` and
+  `TestOnlyUnusedShopsCanBeDeletedPermanently`.
+- Frontend on merged `revamp`: `pnpm build`, `pnpm generate`,
+  `node scripts/locales.check.ts`.
+- Local web preview (Postgres, test data):
+  - a product added with 12 opening stock and Kariakoo Branch chosen: the
+    database shows 12 in Kariakoo and nothing in Main Shop;
+  - deleting Kariakoo (has stock) showed "This shop has sales, stock or other
+    records…"; deleting the unused Typo shop removed it; Main Shop (current)
+    had no delete button;
+  - Close shop moved Kariakoo to Closed; Stop discount showed Stopped;
+    removing a customer emptied the list;
+  - saving Simple books opened Cash flow with Start your books and the
+    "Your starting capital" step;
+  - tabs read "Point of Sale · Faltasi POS", "Products · Faltasi POS",
+    "Cash flow · Faltasi POS"; the top bar shows FALTASI POS.
+
+### Manual follow-up required
+- On a desktop with v2.0.8, check the window title bar says Faltasi POS.
+- The desktop app has no Shops page (one shop per install), so shop delete
+  is online only.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
