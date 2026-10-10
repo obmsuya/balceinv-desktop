@@ -1,6 +1,6 @@
 # Balce features: what changed and why
 
-Pages about the features built between 1 and 10 October 2026: what each one does, why it was added, what was removed, how a shop uses it, and what happens behind the scenes.
+Pages about the features built between 1 and 11 October 2026: what each one does, why it was added, what was removed, how a shop uses it, and what happens behind the scenes.
 
 Written for the owner, the sales and support team, and future developers. Plain words first; each page ends with a short **For developers** section.
 
@@ -19,6 +19,7 @@ Written for the owner, the sales and support team, and future developers. Plain 
 | [Refunds](refunds.md) | Give back some or all items of a sale, by cash, mobile, card or off the customer's debt |
 | [Deleting products](product-delete.md) | Permanent and bulk delete for unused products; Archive for the rest |
 | [Cash flow and the books](money-and-books.md) | What goes into the books by itself, the **Everything (Kila kitu)** view, and **Paid to** for salaries |
+| [Admin panel](admin-panel.md) | pos.faltasi.com/admin for the Faltasi team: every web shop, trials, password resets, the support inbox and an audit log |
 | [Owner requests, v2.0.8](owner-requests-v2-0-8.md) | Shop for new stock, deleting an unused shop, capital when the books go on, Cash flow, Faltasi in the top bar and tabs, and three confirm buttons that did nothing |
 | [Faltasi branding](faltasi-branding.md) | Where the app now says it is made by Faltasi, and why each place was chosen |
 | [Till and receipts](till-and-receipts.md) | Desktop Print without a printer, receipt PDF and Share, held carts, credit wording, copying the full ID |
@@ -36,6 +37,7 @@ Dates are the desktop release dates. Online had each change on the same day or e
 | **v2.0.6** | 8 Oct 2026 | [Permanent and bulk product delete](product-delete.md), with **Archive (Weka kando)** named again. [Refunds](refunds.md), partial or full. |
 | **v2.0.7** | 9 Oct 2026 | [Faltasi branding](faltasi-branding.md) on the start, sign-in and setup screens, the footer, receipts, PDFs and the installer. Plus fixes found while writing these pages: Refund entries on Money open their sale. A refund to the account can no longer leave the customer owed money. Bulk delete sends products ticked on every page, not only the current one. The server refuses a salary without **Paid to**. EFD credit notes say whether they are for a void or a refund. Online had them the same day. |
 | **v2.0.8** | 10 Oct 2026 | [Owner requests](owner-requests-v2-0-8.md): choose the shop for new stock, delete a never-used shop, starting capital when the books are switched on, **Money** renamed **Cash flow (Mzunguko wa fedha)**, Faltasi in the top bar, browser tabs and desktop window title. Fixed **Close shop**, **Stop discount** and removing a customer, which did nothing. |
+| Online only | 11 Oct 2026 | [Admin panel](admin-panel.md) at pos.faltasi.com/admin for the team. Nothing changes in the desktop app. |
 
 > The cashier discount limit was added in v2.0.4 and removed in **v2.0.5** (merged the same day as v2.0.4, 6 Oct). A desktop on v2.0.4 still shows and enforces the limit until it updates.
 
