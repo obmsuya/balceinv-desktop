@@ -2560,6 +2560,49 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - The desktop app has no Shops page (one shop per install), so shop delete
   is online only.
 
+## Phase 37: admin panel for the Faltasi team (2026-10-11)
+
+### Findings being fixed
+- Looking after web shops needed three tools (sales tool, a server command,
+  direct server access); support messages only reached an email inbox; there
+  was no record of who changed what.
+
+### Implementation status
+- [x] Migration 000060 (both engines): `platform_staff`, `platform_sessions`,
+      `platform_audit`, `support_messages.handled_at/handled_by`, Postgres
+      `platform_admin_read` SELECT policies.
+- [x] `backend/internal/admin`: sign-in with password + RFC 6238 code, 8-hour
+      cookie on `/api/admin`, support/admin roles, shops list and detail,
+      create shop, extend trial, reset password, support inbox, audit log.
+      Routes only on Postgres (`registerAdminRoutes`).
+- [x] `balce-admin create-staff` prints password, authenticator key and link.
+- [x] Frontend `/admin`: team sign-in, shops, shop detail with confirmed
+      password reset, create shop, support inbox, audit log; own layout,
+      guard and fetch helper; English and Kiswahili.
+- [x] `docs/features/admin-panel.md` with screenshots; team handbook link.
+- [x] PRs: balceinv-api #82, balceinv #60.
+- [ ] Activate/renew paid plans and device removal stay in the sales tool
+      (Wapangaji owns them).
+
+### Verification performed
+- `TestTheAdminPanelSeesEveryShopOnlyForSignedInTeamMembers`: on Postgres as a
+  NOBYPASSRLS role, wrong code refused, shop owner refused, list and detail
+  across two shops, trial extended, password reset signs the owner out and
+  the one-time password works, support message handled, support role refused
+  for create shop and audit, created shop's owner can sign in, audit has every
+  action, sign-out ends the session. On SQLite the routes do not exist.
+- Full `go vet ./...` and `go test ./...` on SQLite and Postgres; frontend
+  `pnpm build`, `pnpm generate`, `node scripts/locales.check.ts`.
+- Local preview: account made with `create-staff`, signed in with a code
+  computed from the printed key; `/admin` sent to sign-in when signed out;
+  shop list, detail, extend trial (25 Oct → 8 Nov), confirmed reset, create
+  shop, support handled, audit log all worked.
+
+### Manual follow-up required
+- Create the first team accounts on the server:
+  `docker exec balce-api /balce-admin create-staff -email … -name "…" -role admin`
+  and hand over the password and authenticator key privately.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
