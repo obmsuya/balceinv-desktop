@@ -47,7 +47,7 @@ The permission **Void sales (Kubatilisha mauzo)**. The owner has it. Give it to 
 | Area | What happens |
 | :--- | :--- |
 | **Stock** | Every item on the sale goes back to the shop's stock. |
-| **Books** | The sale's entry is reversed in full: money, sales, VAT, and the cost of the goods. It shows on the Money page as **Sale cancelled (Mauzo yaliyoghairiwa)**. If the month is already closed, the reversal goes on the first open day. |
+| **Books** | The sale's entry is reversed in full: money, sales, VAT, and the cost of the goods. It shows on the Cash flow page as **Sale cancelled (Mauzo yaliyoghairiwa)**. If the month is already closed, the reversal goes on the first open day. |
 | **Customer debt** | If part of the sale was **On credit (Mkopo)**, that debt is removed from the customer. |
 | **Totals and reports** | The sale is left out of Sales History totals, the dashboard, every report and the customer's history. |
 | **History** | The sale is **not deleted**. It stays in Sales History with the badge, the reason, who voided it and when. Its receipt number is not reused. |
@@ -73,7 +73,7 @@ Still to confirm with a real EFD provider: that the provider accepts the credit 
 - Service: `Service.Void` and `settleFiscalForVoid` in `backend/internal/sales/service.go`.
 - Errors: 409 `sale_already_voided`, 409 `sale_from_order`, 409 `refund_not_possible` (has refunds), 409 `efd_busy`.
 - Stock: one `stock.RecordMovement` per line, positive change, reason `sale`, reference = receipt number.
-- Books: `accounting.ReverseSource` with original source `sale` and new source type `sale_void`; the reversal's `source_id` is the sale id, so the Money page links it to the receipt.
+- Books: `accounting.ReverseSource` with original source `sale` and new source type `sale_void`; the reversal's `source_id` is the sale id, so the Cash flow page links it to the receipt.
 - EFD: `fiscal_credit_notes` queue; payload from `BuildCreditNotePayload` (`document_type: "credit_note"`, `credit_for: "void"`, `original_receipt_number`, reason) in `backend/internal/sales/fiscal.go`.
 - Leaving voided sales out: `s.voided_at IS NULL` in sales totals, reports, customer debt and the books catch-up (`accounting/replay_repository.go`).
 - Migration 000057: `sales.voided_at`, `voided_by`, `void_reason`, and `fiscal_credit_notes`.

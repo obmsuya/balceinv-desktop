@@ -83,7 +83,7 @@ When the books are on, each refund posts one entry on the refund day:
 | VAT to pay | Down by the VAT in the refund (VAT-registered businesses only). |
 | Stock value and cost of goods sold | Only if restocked: the items' cost goes back to stock value and comes off the cost of goods sold. |
 
-The entry is linked to the customer, if the sale had one. On **Money (Fedha)** with **Show (Onyesha)** → **Everything (Kila kitu)**, a refund is listed as **Sale cancelled (Mauzo yaliyoghairiwa)**, the same label as a void, with "Refund {receipt number} · {reason}" as its note. Opening it shows **Open the receipt (Fungua risiti)**, which opens the sale that was refunded.
+The entry is linked to the customer, if the sale had one. On **Cash flow (Mzunguko wa fedha)** with **Show (Onyesha)** → **Everything (Kila kitu)**, a refund is listed as **Sale cancelled (Mauzo yaliyoghairiwa)**, the same label as a void, with "Refund {receipt number} · {reason}" as its note. Opening it shows **Open the receipt (Fungua risiti)**, which opens the sale that was refunded.
 
 > **Books off?** Refunds recorded while the books are off are **not** added later when the books start. Start the books first if refunds should appear there.
 
@@ -112,7 +112,7 @@ Still to confirm with a real EFD provider: that it accepts the refund note.
 - Endpoint: `POST /api/sales/:id/refunds`, permission `sales:edit`. Body: `client_ref` (8–64), `method` (`cash` | `card` | `mobile` | `credit`), `restock`, `reason` (3–200), `lines: [{ item_id, quantity }]` (1–200 lines). Returns the sale with `refunds[]`, `refunded_total` and per-line `refunded_quantity`; 201 when new, 200 on a replay.
 - Service: `backend/internal/sales/refund.go` (`Refund`, `refundLineAmount`, `checkCreditRefund`); SQL in `refund_repository.go`.
 - Errors: 409 `refund_not_possible` (voided sale; also void on a refunded sale), 400 `refund_too_many` (unknown or repeated line, or above what is left), 400 `refund_credit_not_possible`, 409 `client_ref_reused`.
-- Books: `Ledger.PostSaleRefund` in `backend/internal/accounting/postings.go`. Posted under source type `sale_void` with `source_id` = the refund id, because the SQLite source-type check cannot be changed safely. Entries carry `source_sale_id` (the sale for both voids and refunds), which the Money page uses for **Open the receipt**.
+- Books: `Ledger.PostSaleRefund` in `backend/internal/accounting/postings.go`. Posted under source type `sale_void` with `source_id` = the refund id, because the SQLite source-type check cannot be changed safely. Entries carry `source_sale_id` (the sale for both voids and refunds), which the Cash flow page uses for **Open the receipt**.
 - Credit check: `checkCreditRefund` caps a refund to the account by what the sale put on credit (less earlier credit refunds) and by `customers.Service.Balance`.
 - Debt: `customers/repository.go` subtracts `sale_refunds` with `method = 'credit'`.
 - Totals: `refund_total` on `GET /api/sales/totals` (by sale filter); `refund_count` / `refund_total` and net sales in the reports summary (`reports/repository.go`, `reports/service.go`, by refund date).
