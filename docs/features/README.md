@@ -38,6 +38,7 @@ Dates are the desktop release dates. Online had each change on the same day or e
 | **v2.0.7** | 9 Oct 2026 | [Faltasi branding](faltasi-branding.md) on the start, sign-in and setup screens, the footer, receipts, PDFs and the installer. Plus fixes found while writing these pages: Refund entries on Money open their sale. A refund to the account can no longer leave the customer owed money. Bulk delete sends products ticked on every page, not only the current one. The server refuses a salary without **Paid to**. EFD credit notes say whether they are for a void or a refund. Online had them the same day. |
 | **v2.0.8** | 10 Oct 2026 | [Owner requests](owner-requests-v2-0-8.md): choose the shop for new stock, delete a never-used shop, starting capital when the books are switched on, **Money** renamed **Cash flow (Mzunguko wa fedha)**, Faltasi in the top bar, browser tabs and desktop window title. Fixed **Close shop**, **Stop discount** and removing a customer, which did nothing. |
 | Online only | 11 Oct 2026 | [Admin panel](admin-panel.md) at pos.faltasi.com/admin for the team. Nothing changes in the desktop app. |
+| **v2.0.9** | 11 Oct 2026 | Desktop gets the Faltasi logo next to "by FALTASI" on the start, sign-in and setup screens, the footer and the customer display, plus the v2.0.8-era fixes already online. The admin panel stays online only. |
 
 > The cashier discount limit was added in v2.0.4 and removed in **v2.0.5** (merged the same day as v2.0.4, 6 Oct). A desktop on v2.0.4 still shows and enforces the limit until it updates.
 
