@@ -2632,11 +2632,45 @@ POS_MASTER and wapangaji were read on 2026-09-30.
   web shop activated and shown as "Paid until 10 Nov 2026".
 
 ### Manual follow-up required
-- Review and merge obmsuya/wapangajikiganjani#6 (deploys at 02:00 or 09:00
-  UTC, or `sudo /opt/wapangaji/scripts/deploy.sh`). Until then removal says
-  it needs the update.
+- Done 11 Oct: obmsuya/wapangajikiganjani#6 merged and deployed with
+  `/opt/wapangaji/scripts/deploy.sh` (backups taken, health ok).
 - First real use: sign in with a real partner account and renew one test
   licence.
+
+## Phase 39: admin sidebar, data tables, Faltasi logo and colours (2026-10-11)
+
+### Findings being fixed
+- The admin panel used its own top menu instead of the app's sidebar, and
+  plain tables instead of the sortable data table used elsewhere.
+- The Faltasi logo (`frontend/assets/logo (1).png`) was not used; the admin
+  side had no Faltasi colours; the page metadata had no icon or preview.
+
+### Implementation status
+- [x] `layouts/admin.vue`: fixed top bar and collapsible sidebar like
+      `CustomSidebar.vue`, Faltasi logo, navy primary and gold accents
+      (`setThemeColor`; the shop colour is restored on leaving /admin).
+- [x] `components/admin/DataTable.vue` (TanStack, sorting, paging) and
+      `components/admin/columns.ts` for shops, shop users, audit and licence
+      payments.
+- [x] `public/faltasi-icon.png`, favicon, apple-touch icon; `nuxt.config.ts`
+      head: icons, theme colour, description, Open Graph.
+- [x] Logo beside "by FALTASI" on splash, sign-in, setup, footer, customer
+      display.
+- [x] Wapangaji #6 merged and deployed; live device routes answer 401
+      without a sign-in (404 before).
+- [x] PR: balceinv #62.
+
+### Verification performed
+- `pnpm build`, `pnpm generate`, `node scripts/locales.check.ts`.
+- Playwright at 1280×800 against a local preview: shops sorted by name,
+  shop detail with users table, audit log, licences with the payments table,
+  splash and sign-in; head metadata read from the page.
+- Wapangaji: `scripts/deploy.sh` finished with health 200; `curl` of
+  `balce/admin/devices/` and `remove-device/` gives 401, an unknown path 404.
+
+### Manual follow-up required
+- Sign in to the Licences page with a real partner account and renew or
+  remove a device once; a team account must exist first (`create-staff`).
 
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;

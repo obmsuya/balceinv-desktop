@@ -20,6 +20,7 @@ Before v2.0.7, nothing in the app named Faltasi. The start screen said only **PO
 | Receipt on screen and printed | **Faltasi POS · pos.faltasi.com** (printed: `Faltasi POS - pos.faltasi.com`) as the last line, under the shop's own thank-you | Every customer takes one home. It is the place most likely to bring new shops. |
 | Every PDF (receipt, reports, statements) | Page footer: **… · Faltasi POS · pos.faltasi.com** | Documents travel: shops send them to accountants, suppliers and customers. |
 | Excel files | Page footer **… · Faltasi POS**; file author "Faltasi POS" | Same reason, for printed spreadsheets. |
+| Browser tab icon, home-screen icon, link previews | The Faltasi logo (`/faltasi-icon.png`), theme colour navy, "Faltasi POS" as the site name | Shown when the app is saved to a phone's home screen or a link is shared in WhatsApp |
 | Windows and Mac install | Publisher **Faltasi**, copyright **© 2026 Faltasi** | Shown in Windows **Apps** / **Programs and Features** and the Mac **About** box, where people check who made a program. |
 
 The shop's own name, logo and receipt footer are unchanged and still come first. Faltasi is always the last, smallest line.
