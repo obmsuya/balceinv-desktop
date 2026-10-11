@@ -21,6 +21,7 @@ Before v2.0.7, nothing in the app named Faltasi. The start screen said only **PO
 | Every PDF (receipt, reports, statements) | Page footer: **… · Faltasi POS · pos.faltasi.com** | Documents travel: shops send them to accountants, suppliers and customers. |
 | Excel files | Page footer **… · Faltasi POS**; file author "Faltasi POS" | Same reason, for printed spreadsheets. |
 | Browser tab icon, home-screen icon, link previews | The Faltasi logo (`/faltasi-icon.png`), theme colour navy, "Faltasi POS" as the site name | Shown when the app is saved to a phone's home screen or a link is shared in WhatsApp |
+| Desktop app icon (taskbar, dock, Start menu, installer) | The Faltasi logo, since v2.0.10 | Where people see the app every day |
 | Windows and Mac install | Publisher **Faltasi**, copyright **© 2026 Faltasi** | Shown in Windows **Apps** / **Programs and Features** and the Mac **About** box, where people check who made a program. |
 
 The shop's own name, logo and receipt footer are unchanged and still come first. Faltasi is always the last, smallest line.
@@ -40,7 +41,7 @@ The shop's own name, logo and receipt footer are unchanged and still come first.
 ## What was not done, and why
 
 - **No switch to turn it off.** The line is one small row under the shop's text. Add an owner setting if paying shops ask for unbranded receipts.
-- **No Faltasi logo image.** No final logo file was in the project; text works on every printer and screen. Swap in the logo when one is ready.
+- **The icon is a redraw.** The only logo file was 100×67 px, too small for app icons, so it was redrawn as a vector (`src-tauri/icons/source/faltasi-icon.svg`). If the original artwork turns up, replace that file and run `npx @tauri-apps/cli@2 icon src-tauri/icons/source/faltasi-icon-1024.png -o src-tauri/icons`.
 - **The window title and app name stay "POS" and "Balce Inventory".** Changing the app name would change the install folder and break updates for existing desktops.
 
 ## For developers
