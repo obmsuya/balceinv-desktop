@@ -2603,6 +2603,41 @@ POS_MASTER and wapangaji were read on 2026-09-30.
   `docker exec balce-api /balce-admin create-staff -email … -name "…" -role admin`
   and hand over the password and authenticator key privately.
 
+## Phase 38: licences in the admin panel (2026-10-11)
+
+### Findings being fixed
+- Activating, renewing and freeing computers still needed the sales tool;
+  Wapangaji had no way at all to remove a computer from a licence.
+
+### Implementation status
+- [x] Migration 000061: Wapangaji tokens on `platform_sessions`.
+- [x] `backend/internal/admin`: per-person Wapangaji sign-in with one token
+      refresh; lookup, plans, payment history and record payment through the
+      sales tool's Wapangaji endpoints; a web shop's subscription refreshes
+      right after its payment; device list/remove calls; audit entries.
+- [x] Frontend `/admin/licences` and a link from each shop.
+- [x] Wapangaji: `balce/admin/devices/` and `balce/admin/remove-device/`
+      (obmsuya/wapangajikiganjani#6). **Not merged**: its CLAUDE.md marks the
+      Balce module frozen and merging deploys.
+- [x] PRs: balceinv-api #83, balceinv #61.
+
+### Verification performed
+- `TestTheAdminPanelActivatesLicencesAndRemovesDevicesThroughWapangaji`
+  against a fake Wapangaji; full `go test ./...` on SQLite and Postgres;
+  frontend build, generate, locales check.
+- Wapangaji: `python manage.py check` and `python manage.py test
+  apps.payments` (60 tests, 2 new) in throwaway containers.
+- Local preview with a stand-in Wapangaji: sign-in, desktop licence renewed
+  (14 Oct → 13 Nov), payment listed, computer removed with confirmation,
+  web shop activated and shown as "Paid until 10 Nov 2026".
+
+### Manual follow-up required
+- Review and merge obmsuya/wapangajikiganjani#6 (deploys at 02:00 or 09:00
+  UTC, or `sudo /opt/wapangaji/scripts/deploy.sh`). Until then removal says
+  it needs the update.
+- First real use: sign in with a real partner account and renew one test
+  licence.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
