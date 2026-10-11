@@ -19,7 +19,7 @@ Written for the owner, the sales and support team, and future developers. Plain 
 | [Refunds](refunds.md) | Give back some or all items of a sale, by cash, mobile, card or off the customer's debt |
 | [Deleting products](product-delete.md) | Permanent and bulk delete for unused products; Archive for the rest |
 | [Cash flow and the books](money-and-books.md) | What goes into the books by itself, the **Everything (Kila kitu)** view, and **Paid to** for salaries |
-| [Admin panel](admin-panel.md) | pos.faltasi.com/admin for the Faltasi team: every web shop, trials, password resets, the support inbox and an audit log |
+| [Admin panel](admin-panel.md) | pos.faltasi.com/admin for the Faltasi team: every web shop, trials, password resets, licences (activate, renew, computers), the support inbox and an audit log |
 | [Owner requests, v2.0.8](owner-requests-v2-0-8.md) | Shop for new stock, deleting an unused shop, capital when the books go on, Cash flow, Faltasi in the top bar and tabs, and three confirm buttons that did nothing |
 | [Faltasi branding](faltasi-branding.md) | Where the app now says it is made by Faltasi, and why each place was chosen |
 | [Till and receipts](till-and-receipts.md) | Desktop Print without a printer, receipt PDF and Share, held carts, credit wording, copying the full ID |
