@@ -37,6 +37,8 @@ It prints a **password**, an **authenticator key** and an **authenticator link**
 
 ## What it does
 
+The panel looks like the shop app: a top bar, and a sidebar on the left (**Shops and licences**: Shops, Licences, Support inbox; **Team**: Audit log). It uses Faltasi navy and gold, from the Faltasi logo; shops keep their own colour in the shop app. Lists are sortable tables: click a column heading to sort, click again to reverse.
+
 ### Shops
 
 Every web business, newest first, with search by business name or email. Each row shows the owner, the plan (trial, paid or ended, with the date), sales in the last 30 days, the last sale and when they joined.
@@ -78,7 +80,7 @@ Desktop shops are not listed: their data stays on their own computer. Their lice
 
 ![A web shop shown as paid after activation](images/admin-licences-paid-shop.png)
 
-> **Removing computers needs a Wapangaji update** (obmsuya/wapangajikiganjani#6). Until it is merged and deployed, the Computers card says so and removal is not possible.
+Removing computers uses two Wapangaji routes added for the panel (obmsuya/wapangajikiganjani#6, live since 11 Oct 2026).
 
 ### Support inbox
 
@@ -96,7 +98,6 @@ Every sign-in and every action in the panel: who, what, which business, and deta
 
 | Not yet | Why | Until then |
 | :--- | :--- | :--- |
-| Remove computers, until Wapangaji #6 is deployed | The Balce module in Wapangaji is marked frozen and merging there deploys, so it waits for approval | Ask the technical team |
 | Create or edit plans (such as removing the TSh 100 "Dev License") | Only the Wapangaji system admin may do it | Sales tool → Manage Packages |
 | Suspend a shop, announcements, health charts | Not asked for in the first version | Ask when needed |
 | Team members change their own password | Passwords are random and long; the server command replaces them | Run `create-staff` again |
@@ -115,4 +116,5 @@ Every sign-in and every action in the panel: who, what, which business, and deta
 - Licences: `backend/internal/admin/wapangaji.go` (client, token refresh), `licence_service.go`, `licence_handler.go`; migration 000061 adds `wapangaji_access`, `wapangaji_refresh`, `wapangaji_name` to `platform_sessions`. Test `TestTheAdminPanelActivatesLicencesAndRemovesDevicesThroughWapangaji`. Screen `frontend/app/pages/admin/licences.vue`.
 - Test: `TestTheAdminPanelSeesEveryShopOnlyForSignedInTeamMembers` (Postgres, as a role that cannot bypass row-level security).
 - Frontend: `frontend/app/pages/admin/*`, `layouts/admin.vue`, `middleware/admin.ts`, `composables/useAdmin.ts`, `components/admin/OneTimePasswordDialog.vue`, `locales/*/admin.json`.
-- PRs: balceinv-api #82, #83; balceinv #60, #61; Wapangaji obmsuya/wapangajikiganjani#6 (devices, not merged). Details: `steps.md`, Phases 37 and 38.
+- Layout and tables: `frontend/app/layouts/admin.vue`, `components/admin/DataTable.vue`, `components/admin/columns.ts`; colours via `setThemeColor` in `utils/brandTheme.ts`.
+- PRs: balceinv-api #82, #83; balceinv #60, #61, #62; Wapangaji obmsuya/wapangajikiganjani#6. Details: `steps.md`, Phases 37 to 39.
