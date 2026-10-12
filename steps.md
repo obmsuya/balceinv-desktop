@@ -2672,6 +2672,39 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - Sign in to the Licences page with a real partner account and renew or
   remove a device once; a team account must exist first (`create-staff`).
 
+## Phase 40: products per shop, v2.0.11 (2026-10-12)
+
+### Findings being fixed
+- Every product showed and sold in every shop; the owner wants each shop to
+  have its own products (`backend/internal/products`, `internal/sales`,
+  `frontend/app/pages/products/index.vue`, `ProductFormDialog.vue`).
+
+### Implementation status
+- [x] Migration 000062: `shop_stock.is_listed` default true; a missing row
+      means "sold here", so no data migration (avoids the RLS backfill trap
+      from the subscriptions incident).
+- [x] List and till filtered by shop; `include_other_shops` for the owner;
+      `in_shop`, `hidden_shop_ids`; `shop_ids` on create/update (open shops);
+      variants follow the parent; `POST /api/products/shops` bulk add/remove,
+      keeping products the shop still stocks; incoming stock relists.
+- [x] Sales and barcode lookup refuse unlisted products.
+- [x] Frontend: Sold in checkboxes, other-shops switch and tag, bulk dialog.
+- [x] `docs/features/shop-products.md` with screenshots.
+- [x] PRs: balceinv-api #84, balceinv #64.
+
+### Verification performed
+- `TestEachShopSellsOnlyTheProductsItCarries` on SQLite and Postgres (caught
+  a Postgres parameter-type error that SQLite missed); full `go test ./...`
+  on both; frontend build, generate, locales check.
+- Playwright on a local preview with two shops: product made for the branch
+  only, hidden in Main Shop and shown with the tag when the switch is on;
+  bulk remove kept the stocked product; Main Shop's till listed only its
+  products; the edit form showed the right shops ticked.
+
+### Manual follow-up required
+- A real two-shop business: hide a product from one shop and confirm its
+  till no longer shows it.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
