@@ -20,6 +20,7 @@ Written for the owner, the sales and support team, and future developers. Plain 
 | [Deleting products](product-delete.md) | Permanent and bulk delete for unused products; Archive for the rest |
 | [Cash flow and the books](money-and-books.md) | What goes into the books by itself, the **Everything (Kila kitu)** view, and **Paid to** for salaries |
 | [Products per shop](shop-products.md) | Each shop sells only the products it carries: "Sold in" on each product, bulk add/remove, and a switch to see other shops' products |
+| [Clearing test data, and seeing every shop](clear-data-and-shop-views.md) | The owner clears trial data with the business name and password; sales, stock, stock history and alerts per shop or across shops; bring stock in from another shop |
 | [Admin panel](admin-panel.md) | pos.faltasi.com/admin for the Faltasi team: every web shop, trials, password resets, licences (activate, renew, computers), the support inbox and an audit log |
 | [Owner requests, v2.0.8](owner-requests-v2-0-8.md) | Shop for new stock, deleting an unused shop, capital when the books go on, Cash flow, Faltasi in the top bar and tabs, and three confirm buttons that did nothing |
 | [Faltasi branding](faltasi-branding.md) | Where the app now says it is made by Faltasi, and why each place was chosen |
