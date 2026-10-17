@@ -43,6 +43,7 @@ Dates are the desktop release dates. Online had each change on the same day or e
 | **v2.0.9** | 11 Oct 2026 | Desktop gets the Faltasi logo next to "by FALTASI" on the start, sign-in and setup screens, the footer and the customer display, plus the v2.0.8-era fixes already online. The admin panel stays online only. |
 | **v2.0.10** | 11 Oct 2026 | The desktop app icon is now the Faltasi logo (taskbar, dock, Start menu, installer); sharper logo on the web too. |
 | **v2.0.11** | 12 Oct 2026 | [Products per shop](shop-products.md): choose which shops sell each product; the till and product list show only the shop's products. |
+| **v2.0.12** | 17 Oct 2026 | [Clearing test data, and seeing every shop](clear-data-and-shop-views.md): the owner clears trial data; sales, stock, stock history and alerts per shop or across all shops; bring stock in from another shop. Staff can only open sales from their own shops. |
 
 > The cashier discount limit was added in v2.0.4 and removed in **v2.0.5** (merged the same day as v2.0.4, 6 Oct). A desktop on v2.0.4 still shows and enforces the limit until it updates.
 

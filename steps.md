@@ -2705,7 +2705,7 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - A real two-shop business: hide a product from one shop and confirm its
   till no longer shows it.
 
-## Phase 41: clearing test data, and every shop side by side (2026-10-17)
+## Phase 41: clearing test data, and every shop side by side, v2.0.12 (2026-10-17)
 
 ### Findings being fixed
 - No way to clear test data after the trial (balceinv-api#85, balceinv#65):
@@ -2748,9 +2748,9 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - [x] Frontend: shop picker, Shop columns, a column per shop on stock
       levels, shop names on alerts, Other shops + Bring here, Take from.
 - [x] `docs/features/clear-data-and-shop-views.md` and its index row.
-- [x] PRs: balceinv-api #93 (clear), #94 (sale scope fix), #95 → #96 → #97
-      (stacked: sales, stock, alerts); balceinv #70 (clear), #71 → #72 →
-      #73 → #75 (stacked: sales, stock, alerts, bring stock).
+- [x] PRs merged into revamp in order: balceinv-api #93, #94, #95, #96,
+      #97; balceinv #70, #71, #72, #73, #75 (stacked ones retargeted first).
+- [x] Release v2.0.12: submodules at the merged revamp tips, version 2.0.12.
 
 ### Verification performed
 - `go build ./...` and `go vet ./...` on all backend branches merged
@@ -2767,8 +2767,14 @@ POS_MASTER and wapangaji were read on 2026-09-30.
   `TestStaffOnlyOpenSalesFromTheirShops`,
   `TestSalesListShowsTheShopOfEachSale`, `TestOwnerSeesStockInEveryShop`,
   `TestAlertsNameTheirShopAndTheOwnerSeesEveryShop`.
-- Postgres was not run locally (Docker Desktop would not start); CI runs
-  every test on Postgres.
+- Postgres 17 in Docker, `go test ./...` on each of the five backend PR
+  branches: every new test passes on both engines (a verbose run shows the
+  `/postgres` subtests). Besides the Windows failures above, only
+  `products/TestImportIsAllOrNothing` failed, on a 10 s upload timeout
+  against the local Docker Postgres; it fails the same way on untouched
+  `origin/revamp`.
+- Merged revamp: `go build ./...`, `go vet ./...`, the tests of the new and
+  touched packages, `pnpm generate` and the locales check all pass.
 - `pnpm generate` on balceinv `feat/clear-business-data` and on the top of
   the stack `feat/stock-from-other-shops`: both build.
 - `scripts/locales.check.ts` (run from a copy, because the script's
@@ -2781,8 +2787,6 @@ POS_MASTER and wapangaji were read on 2026-09-30.
   here moved 2 Mchele from Tawi la Kariakoo to Main Shop (3 → 5).
 
 ### Manual follow-up required
-- CI on Postgres for balceinv-api #93–97 before merging; #93 adds the
-  journal migration.
 - Online, with a real trial account: clear the data from the trial badge,
   then confirm the trial days left are unchanged.
 - Desktop: build a release with these PRs, test with a trial that has
@@ -2790,7 +2794,9 @@ POS_MASTER and wapangaji were read on 2026-09-30.
   cleared database restarts cleanly.
 - Two-shop business with a cashier per shop: each cashier sees only their
   own shop's sales in history; the owner sees both with All shops.
-- Retarget the stacked PRs to `revamp` as each one below them merges.
+- Merging the release into `main` deploys pos.faltasi.com (migration
+  000063 runs, after the deploy's database backup). Tag `v2.0.12` for the
+  desktop installers.
 
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;

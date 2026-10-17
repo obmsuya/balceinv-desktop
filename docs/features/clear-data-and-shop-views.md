@@ -1,6 +1,6 @@
 # Clearing test data, and seeing every shop
 
-**Not released yet.** Waiting on review: balceinv-api #93–97, balceinv #70–73 and #75. Online gets it when the PRs merge; the desktop app gets it in the next version.
+**Added in v2.0.12 (17 Oct 2026).** Online when this release merges; desktop from v2.0.12. The per-shop views matter for businesses with more than one shop.
 
 Two things the owner asked for:
 
