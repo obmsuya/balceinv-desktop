@@ -20,6 +20,7 @@ Written for the owner, the sales and support team, and future developers. Plain 
 | [Deleting products](product-delete.md) | Permanent and bulk delete for unused products; Archive for the rest |
 | [Cash flow and the books](money-and-books.md) | What goes into the books by itself, the **Everything (Kila kitu)** view, and **Paid to** for salaries |
 | [Products per shop](shop-products.md) | Each shop sells only the products it carries: "Sold in" on each product, bulk add/remove, and a switch to see other shops' products |
+| [Clearing test data, and seeing every shop](clear-data-and-shop-views.md) | The owner clears trial data with the business name and password; sales, stock, stock history and alerts per shop or across shops; bring stock in from another shop |
 | [Admin panel](admin-panel.md) | pos.faltasi.com/admin for the Faltasi team: every web shop, trials, password resets, licences (activate, renew, computers), the support inbox and an audit log |
 | [Owner requests, v2.0.8](owner-requests-v2-0-8.md) | Shop for new stock, deleting an unused shop, capital when the books go on, Cash flow, Faltasi in the top bar and tabs, and three confirm buttons that did nothing |
 | [Faltasi branding](faltasi-branding.md) | Where the app now says it is made by Faltasi, and why each place was chosen |
@@ -42,6 +43,7 @@ Dates are the desktop release dates. Online had each change on the same day or e
 | **v2.0.9** | 11 Oct 2026 | Desktop gets the Faltasi logo next to "by FALTASI" on the start, sign-in and setup screens, the footer and the customer display, plus the v2.0.8-era fixes already online. The admin panel stays online only. |
 | **v2.0.10** | 11 Oct 2026 | The desktop app icon is now the Faltasi logo (taskbar, dock, Start menu, installer); sharper logo on the web too. |
 | **v2.0.11** | 12 Oct 2026 | [Products per shop](shop-products.md): choose which shops sell each product; the till and product list show only the shop's products. |
+| **v2.0.12** | 17 Oct 2026 | [Clearing test data, and seeing every shop](clear-data-and-shop-views.md): the owner clears trial data; sales, stock, stock history and alerts per shop or across all shops; bring stock in from another shop. Staff can only open sales from their own shops. |
 
 > The cashier discount limit was added in v2.0.4 and removed in **v2.0.5** (merged the same day as v2.0.4, 6 Oct). A desktop on v2.0.4 still shows and enforces the limit until it updates.
 

@@ -2705,6 +2705,99 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - A real two-shop business: hide a product from one shop and confirm its
   till no longer shows it.
 
+## Phase 41: clearing test data, and every shop side by side, v2.0.12 (2026-10-17)
+
+### Findings being fixed
+- No way to clear test data after the trial (balceinv-api#85, balceinv#65):
+  new `backend/internal/cleardata`, migrations 000063,
+  `frontend/app/components/settings/ClearData*.vue`, trial badge and lock
+  screen in `frontend/app/components/license/`.
+- Staff could open, void or refund another shop's sale by its id
+  (balceinv-api#86): `backend/internal/sales/access.go`, `invoices/service.go`.
+- Sales, stock levels, stock history and alerts only ever showed the current
+  shop (balceinv-api#87–89, balceinv#66–68): new
+  `backend/internal/common/shopscope`, `sales/history_repository.go`,
+  `stock/levels_repository.go`, `stock/history_repository.go`,
+  `notifications/repository.go`; `frontend/app/components/ShopScopeSelect.vue`,
+  `pages/sales`, `pages/stock`, `pages/notifications`, `AppHeader.vue`.
+- A shop that ran out could not see who had stock or bring it in
+  (balceinv#69): `components/stock/OtherShopsStock.vue`,
+  `SendStockDialog.vue` (Take from).
+- Found and filed, not fixed here: product image left in storage on delete
+  (balceinv-api#90), business move skips purchase attachments (#91),
+  `/api/shops` lists every shop to staff (#92), the till's not-enough-stock
+  message does not name other shops (balceinv#74).
+
+### Implementation status
+- [x] Migration pair 000063: the journal accepts a delete of one company's
+      rows only while that company is being cleared (Postgres
+      `app.clearing_company_id`, SQLite `journal_clearing` row inside the
+      transaction).
+- [x] `POST /api/business/clear-data`: owner only, business name + password,
+      one transaction, everything in `ClearedTables`, other shops and staff
+      removed, receipt numbers restart, files deleted after commit; passes
+      the desktop licence lock. Subscription row kept (deleting it would
+      grant a new trial).
+- [x] Clear data card in Settings → Business, suggestion in the trial badge
+      and on the trial-ended lock screen, typed-name confirmation with
+      clearing/done states.
+- [x] Sale view, receipt, PDF, void and refund limited to the user's shops.
+- [x] `shopscope` and `?shop=` on sales, sales totals, stock, stock summary,
+      stock movements and notifications; `shop_name` on every row;
+      per-shop quantities on stock rows across shops; `product_id` filter.
+- [x] Frontend: shop picker, Shop columns, a column per shop on stock
+      levels, shop names on alerts, Other shops + Bring here, Take from.
+- [x] `docs/features/clear-data-and-shop-views.md` and its index row.
+- [x] PRs merged into revamp in order: balceinv-api #93, #94, #95, #96,
+      #97; balceinv #70, #71, #72, #73, #75 (stacked ones retargeted first).
+- [x] Release v2.0.12: submodules at the merged revamp tips, version 2.0.12.
+
+### Verification performed
+- `go build ./...` and `go vet ./...` on all backend branches merged
+  locally: clean.
+- `go test ./...` on SQLite with every backend branch merged: all pass
+  except `internal/config` (two desktop path tests) and the
+  `internal/server` static test, which fail the same way on untouched
+  `origin/revamp` on Windows (backslash paths, a temp file Windows keeps
+  open).
+- New tests: `TestOwnerClearsEverythingButTheOwnerAndOneShop`,
+  `TestJournalStaysAppendOnlyOutsideAClear`,
+  `TestEveryCompanyTableIsClearedOrKept`,
+  `TestClearingStaysOpenWhenTheDesktopTrialHasEnded`,
+  `TestStaffOnlyOpenSalesFromTheirShops`,
+  `TestSalesListShowsTheShopOfEachSale`, `TestOwnerSeesStockInEveryShop`,
+  `TestAlertsNameTheirShopAndTheOwnerSeesEveryShop`.
+- Postgres 17 in Docker, `go test ./...` on each of the five backend PR
+  branches: every new test passes on both engines (a verbose run shows the
+  `/postgres` subtests). Besides the Windows failures above, only
+  `products/TestImportIsAllOrNothing` failed, on a 10 s upload timeout
+  against the local Docker Postgres; it fails the same way on untouched
+  `origin/revamp`.
+- Merged revamp: `go build ./...`, `go vet ./...`, the tests of the new and
+  touched packages, `pnpm generate` and the locales check all pass.
+- `pnpm generate` on balceinv `feat/clear-business-data` and on the top of
+  the stack `feat/stock-from-other-shops`: both build.
+- `scripts/locales.check.ts` (run from a copy, because the script's
+  `URL.pathname` breaks on Windows): same keys in English and Kiswahili.
+- In the browser against a local backend: wrong password refused with
+  nothing deleted; clear removed products, sales and the second shop and
+  opened the dashboard; Escape could not close the dialog mid-clear. All
+  shops showed both shops' sales, a column per shop on stock levels (6 =
+  3 + 3, 22 = 12 + 10), the shop on each stock change and alert, and Bring
+  here moved 2 Mchele from Tawi la Kariakoo to Main Shop (3 → 5).
+
+### Manual follow-up required
+- Online, with a real trial account: clear the data from the trial badge,
+  then confirm the trial days left are unchanged.
+- Desktop: build a release with these PRs, test with a trial that has
+  ended, and clear from the lock screen. Then make a backup and confirm the
+  cleared database restarts cleanly.
+- Two-shop business with a cashier per shop: each cashier sees only their
+  own shop's sales in history; the owner sees both with All shops.
+- Merging the release into `main` deploys pos.faltasi.com (migration
+  000063 runs, after the deploy's database backup). Tag `v2.0.12` for the
+  desktop installers.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
