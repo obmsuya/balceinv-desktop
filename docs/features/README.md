@@ -44,6 +44,7 @@ Dates are the desktop release dates. Online had each change on the same day or e
 | **v2.0.10** | 11 Oct 2026 | The desktop app icon is now the Faltasi logo (taskbar, dock, Start menu, installer); sharper logo on the web too. |
 | **v2.0.11** | 12 Oct 2026 | [Products per shop](shop-products.md): choose which shops sell each product; the till and product list show only the shop's products. |
 | **v2.0.12** | 17 Oct 2026 | [Clearing test data, and seeing every shop](clear-data-and-shop-views.md): the owner clears trial data; sales, stock, stock history and alerts per shop or across all shops; bring stock in from another shop. Staff can only open sales from their own shops. |
+| **v2.0.13** | 17 Oct 2026 | Thin scrollbars in the app's colours everywhere. Product import: choose which shop gets the opening stock, the 5 MB / 5,000-row limits shown in the dialog, blank rows no longer counted, clearer message when the whole file cannot be used. **Users** shows which shops each person works in. |
 
 > The cashier discount limit was added in v2.0.4 and removed in **v2.0.5** (merged the same day as v2.0.4, 6 Oct). A desktop on v2.0.4 still shows and enforces the limit until it updates.
 
