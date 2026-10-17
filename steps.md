@@ -2798,6 +2798,77 @@ POS_MASTER and wapangaji were read on 2026-09-30.
   000063 runs, after the deploy's database backup). Tag `v2.0.12` for the
   desktop installers.
 
+## Phase 42: scrollbars, product import per shop, and who works where (2026-10-17)
+
+### Findings being fixed
+- Thick grey Windows scrollbars with arrows everywhere, light grey in dark
+  mode (balceinv#76): `frontend/app/assets/css/main.css`.
+- Product import put opening stock only in the current shop, with no way to
+  choose and nothing saying which shop (balceinv-api#98, balceinv#78):
+  `backend/internal/products/import.go`, `handler.go`;
+  `frontend/app/components/products/ProductImportDialog.vue`,
+  `composables/useProducts.ts`.
+- The import dialog never stated its limits (balceinv#79).
+- Blank rows counted toward the 5,000-row limit (balceinv-api#100):
+  `backend/internal/products/import_parsing.go`.
+- Whole-file import errors said "fix the rows shown" with no rows shown
+  (balceinv#80): `frontend/app/locales/*/errors.json`.
+- The users table did not show who works in which shop (balceinv#81):
+  `frontend/app/components/users/columns.ts`, `pages/users/index.vue`.
+- Answered, no change needed: staff are assigned to shops with the
+  **Works in** checkboxes on Users → Edit. Untick a shop and tick another to
+  move someone, and their sessions in the shop they lost are signed out.
+  A cashier cannot import products unless their role has `products:create`,
+  and the template needs the same permission. The template download already
+  shows its success toast only after the file is saved; the CLAUDE.md note
+  about `downloadTemplate` is out of date.
+- Filed, not fixed: import problem messages are English only
+  (balceinv-api#101).
+
+### Implementation status
+- [x] One global scrollbar style: an 8 px rounded thumb in the theme colour,
+      no arrows, with its own shade in dark mode (`::-webkit-scrollbar` for
+      Chromium and WebKit, `scrollbar-width`/`scrollbar-color` for Firefox).
+      Merged (balceinv#77).
+- [x] `shop_id` form field on `POST /api/products/upload`, checked once like
+      single-product create; picker in the import dialog (balceinv-api#102,
+      balceinv#82).
+- [x] Limits text under the file picker, from constants (balceinv#83).
+- [x] Only filled rows count toward the row limit (balceinv-api#103).
+- [x] Own text for `invalid_import` in English and Kiswahili (balceinv#84).
+- [x] **Works in** column for multi-shop businesses (balceinv#85).
+- [x] Limit raise to 10 MB / 20,000 rows: measured, then dropped by the
+      owner's decision (balceinv-api#99 closed).
+
+### Verification performed
+- Import timing, CSV with quantities, measured locally:
+  5,000 rows took 3.8 s on SQLite and 45 s on Postgres 17 (Docker on
+  Windows); 20,000 rows took 15.3 s and 2 min 47 s. That is 8 database
+  queries per imported row. On the server the estimate for 20,000 rows is
+  55–85 s, too close to Cloudflare's 100 s cutoff, so the limit stays at
+  5 MB and 5,000 rows.
+- `TestImportPutsOpeningStockInTheChosenShop` and
+  `TestImportRowLimitCountsOnlyFilledRows` pass on SQLite and Postgres;
+  `TestImportUnderstandsRealSpreadsheets` still passes on both.
+- Locales check after every frontend change: same keys in both languages.
+- In the browser against a local backend (both backend branches merged
+  locally):
+  - dark and light mode: the sidebar scrollbar is thin with no arrows;
+  - Users showed "Tawi la Kariakoo" for a branch cashier and "All shops"
+    for the owner;
+  - the import dialog showed the limits and the shop picker;
+  - importing with the default put 15 Sukari in Main Shop, and importing
+    with Tawi la Kariakoo chosen put 12 Mafuta there and none in Main Shop;
+  - a blank row in the file was ignored.
+
+### Manual follow-up required
+- Merge order: balceinv-api #102 and #103 before balceinv #82 and #83
+  (#83 is stacked on #82). Then a release PR bumps both submodules.
+- On a real Windows PC, after release: check the scrollbars in the desktop
+  app (WebView2) and in Edge. On a Mac, check Safari and the macOS app.
+- On a business with two shops, import the template into the second shop
+  and check its stock page.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
