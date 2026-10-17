@@ -13,6 +13,8 @@ Guides for the Balce sales and support team: how to set a shop up, how to answer
 | [How subscription payments work](how-payments-work.md) | What happens between the POS, Wapangaji and mobile money, step by step, and where it gets stuck |
 | [The sales tool](sales-tool.md) | Getting the FALTASI POS Control Centre, signing in, activating, searching, payment history and plans |
 | [Desktop or online, and moving a shop online](moving-online.md) | Why data does not follow a shop between the desktop app and pos.faltasi.com, and how to move a desktop shop online with everything |
+| [Adding stock](adding-stock.md) | New products with opening stock, importing from Excel, Stock arrived, Change stock, History, and every field and switch that hides products, with screenshots |
+| [Moving stock between shops](stock-transfers.md) | Send stock, Bring here when a shop runs low, all shops side by side, past transfers, and who may move stock, with screenshots |
 | [Discounts at the till](till-discounts.md) | Planned discounts, cashier discounts and who may give them |
 | [Admin panel](../features/admin-panel.md) | The team page at pos.faltasi.com/admin: signing in with a phone code, shops, trials, password resets, the support inbox |
 | [Features: what changed and why](../features/README.md) | Each feature from 1 to 8 October with screenshots: why it was added, what was removed, how it works. Voiding a sale and refunds are explained there |
@@ -26,13 +28,12 @@ Written in this order, most-asked first. Each guide follows the same shape: the 
 - Users and roles: adding cashiers, what each role allows, resetting a password.
 - Printers, scanners and the cash drawer: plugging in, testing, what to do when nothing prints.
 - Extra tills on the shop network: connecting a second computer or tablet to the main one.
-- Branches: adding a shop, receipt prefixes, sending stock between shops.
+- Branches: adding a shop and receipt prefixes. (Sending stock between shops is in [Moving stock between shops](stock-transfers.md).)
 - Moving from the old Balce: importing old data.
 
 **2. Daily work**
 - Selling at the till: search and scan, several carts, payment methods, discounts.
 - Printing a receipt again.
-- Stock: stock arrived, changing stock with a reason, stock counts.
 - Customers and credit (madeni): selling on credit, taking payments, reminders, statements.
 - Orders and deposits.
 - Suppliers: deliveries, paying suppliers, supplier statements.
