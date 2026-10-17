@@ -2798,7 +2798,7 @@ POS_MASTER and wapangaji were read on 2026-09-30.
   000063 runs, after the deploy's database backup). Tag `v2.0.12` for the
   desktop installers.
 
-## Phase 42: scrollbars, product import per shop, and who works where (2026-10-17)
+## Phase 42: scrollbars, product import per shop, and who works where, v2.0.13 (2026-10-17)
 
 ### Findings being fixed
 - Thick grey Windows scrollbars with arrows everywhere, light grey in dark
@@ -2862,8 +2862,8 @@ POS_MASTER and wapangaji were read on 2026-09-30.
   - a blank row in the file was ignored.
 
 ### Manual follow-up required
-- Merge order: balceinv-api #102 and #103 before balceinv #82 and #83
-  (#83 is stacked on #82). Then a release PR bumps both submodules.
+- Released as v2.0.13: balceinv-api #102, #103 and balceinv #82–#85
+  merged in order into revamp; the release PR bumps both submodules.
 - On a real Windows PC, after release: check the scrollbars in the desktop
   app (WebView2) and in Edge. On a Mac, check Safari and the macOS app.
 - On a business with two shops, import the template into the second shop
