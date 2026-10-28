@@ -2869,7 +2869,7 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - On a business with two shops, import the template into the second shop
   and check its stock page.
 
-## Phase 43: invoices, quotations, delivery notes, supplier invoices and purchase order PDF (2026-10-28)
+## Phase 43: invoices, quotations, delivery notes, supplier invoices and purchase order PDF, v2.0.14 (2026-10-28)
 
 ### Findings being fixed
 - No invoice generator. The only "invoice" was the A4 copy of a finished,
@@ -2987,11 +2987,10 @@ POS_MASTER and wapangaji were read on 2026-09-30.
     line shows; the purchase order PDF downloads.
 
 ### Manual follow-up required
-- **Merge order:**
-  - backend: balceinv-api #108 → retarget #109 to `revamp` → #109 →
-    retarget #110 → #110;
-  - frontend: balceinv #88 → retarget #89 → #89;
-  - then a desktop release PR that bumps both submodules.
+- Released as v2.0.14: balceinv-api #108, #109 and #110 and balceinv #88
+  and #89 merged in order into revamp; the release PR bumps both
+  submodules. Migrations 000064–000067 run on the server after the
+  deploy's database backup.
 - **Before releasing the desktop app:** copy a real shop's `balce.sqlite`
   that has the books switched on, start the new build against the copy, and
   check that it reaches schema 67 and that Money → Books still lists the old
