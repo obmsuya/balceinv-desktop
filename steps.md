@@ -2869,6 +2869,145 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - On a business with two shops, import the template into the second shop
   and check its stock page.
 
+## Phase 43: invoices, quotations, delivery notes, supplier invoices and purchase order PDF (2026-10-28)
+
+### Findings being fixed
+- No invoice generator. The only "invoice" was the A4 copy of a finished,
+  paid sale (`backend/internal/invoices/service.go`). There was no way to
+  bill a customer first and be paid later, send a proforma or quotation, or
+  print a delivery note.
+- Purchase orders had no document to send to the supplier
+  (`backend/internal/suppliers/order_service.go`).
+- The A4 layout was plain: no Bill to block, due date, payment details,
+  status, amount in words or signatures (`backend/internal/documents/pdf.go`).
+- There was nowhere to keep bank and Lipa number details, default terms or
+  days to pay.
+- Owner decisions:
+  - **Customer documents:** invoice, proforma, quotation, delivery note.
+    The invoice is tracked as unpaid, part paid, paid or overdue. Stock and
+    the books move on delivery; payments can come before or after.
+  - **Supplier documents:** a branded purchase order, and invoices billed
+    to a supplier, settled by offset or by money received.
+  - **Lines:** a product or typed text.
+  - **Permissions:** a new `invoices:*` permission group.
+- Issues: balceinv-api #105, #106, #107; balceinv #86, #87.
+
+### Implementation status
+- [x] **Branded A4 invoice writer** (`backend/internal/documents/invoice.go`,
+      `invoice_pdf.go`):
+      - header, status chip, Bill to / details boxes, wrapping lines;
+      - totals with the highlighted balance, amount in words (English and
+        Kiswahili), how to pay, terms, notes, EFD QR, signatures;
+      - repeated headers on long invoices.
+      The sale A4 invoice and receipt PDF use it. Settings fields
+      (migration 000064): `email`, `invoice_payment_details`,
+      `invoice_terms`, `invoice_due_days`. (balceinv-api #108)
+- [x] **Customer invoices, proforma, quotations, delivery notes**
+      (`backend/internal/invoices/bill_*.go`, `repository.go`):
+      - migrations 000065–000067: tables, the `invoices_enabled` switch,
+        permissions, journal sources, stock reasons;
+      - `/api/invoices` routes: list, summary, document, create, edit,
+        issue, accept, deliver, payments, convert, cancel;
+      - delivery moves stock and posts the books (`accounting/invoice_postings.go`);
+      - customer balance, debtors and statement include delivered invoices,
+        and a customer who paid ahead shows in credit (`customers/aging.go`,
+        `repository.go`).
+      (balceinv-api #109)
+- [x] **Supplier invoices and the purchase order PDF:**
+      - money from suppliers (`supplier_receipts`,
+        `accounting/supplier_receipt_postings.go`);
+      - supplier ledger entries `invoice` and `receipt`
+        (`suppliers/repository.go`, `ledger.go`);
+      - `GET /api/purchase-orders/:id/document`
+        (`suppliers/order_document.go`).
+      (balceinv-api #110)
+- [x] **Invoices page** (`frontend/app/pages/invoices/index.vue`):
+      - editor with a live PDF preview (`components/invoices/*`);
+      - details sheet;
+      - settings card;
+      - customer page tab and in-credit balance;
+      - roles, features and locale strings.
+      (balceinv #88)
+- [x] **Supplier invoices in the app:** the editor, list and details;
+      "Bill this supplier" on the supplier page; PDF and Share on purchase
+      orders; one shared `sharePdf` helper (`frontend/app/utils/download.ts`).
+      (balceinv #89)
+- [x] **Docs:** `docs/features/invoices.md`, `docs/team/invoices.md`.
+
+### Verification performed
+- `go build ./...` and `go vet` pass on every backend branch.
+- **SQLite and Postgres 17** (Docker, `TEST_DATABASE_URL`): `invoices`,
+  `common/database`, `cleardata`, `customers`, `accounting`, `features`,
+  `settings`, `documents`, `orders`, `sales` and `suppliers` all pass.
+  Three packages fail only on this Windows PC, in code these PRs do not
+  touch:
+  - `config`: it expects `/tmp` paths;
+  - `server`: the static-file test hits a temp-folder file lock;
+  - `catalog`: it is timing-sensitive and passes on a re-run.
+- **Journal rebuild:** `TestJournalRebuildKeepsTheBooksAndTheirGuards`
+  migrates a database that already holds books from 65 to 67. It checks
+  that:
+  - the entries, lines and reversal link survive;
+  - `PRAGMA foreign_key_check` is clean;
+  - UPDATE and DELETE are still refused;
+  - clear-data can still delete;
+  - the new source types are accepted, and unknown ones are refused.
+- **Invoice flow tests:**
+  - **Draft to paid:** stock out only on delivery, debt and credit, one
+    balanced books entry with cost of goods, the statement line, overpayment
+    refused.
+  - **Cancel after delivery:** everything is put back.
+  - **Quotation:** quotation → invoice → delivery note, plus the filters and
+    the summary.
+  - **Line checks** for each error code.
+  - **Permissions** and other companies.
+  - **Supplier settlement:** offset, bank money received and its
+    cancellation, checked against the supplier balance and the books.
+  - **Purchase order PDF** in English and Kiswahili.
+- **PDFs checked by eye** (rendered to files):
+  - an English invoice with logo, discount, payment details and signatures;
+  - a three-page Swahili invoice;
+  - a delivery note;
+  - the supplier invoice;
+  - the purchase order.
+  This found the "how to pay" text overlapping beside short totals. It was
+  fixed and checked again.
+- **Frontend:** `pnpm build` passes; the locales check passes (3065 keys in
+  each language, run with a Windows-safe copy of the script).
+- **In the browser against a local backend:**
+  - **Customer invoice:** create with product, typed line and discount → live
+    preview → Save and send → part payment → Mark delivered (stock 20 → 16)
+    → pay the rest (Paid).
+  - **Quotation:** quotation → invoice.
+  - **Settings card:** saves all four fields.
+  - **Customer page:** In credit, and the statement line.
+  - **Phone width (375 px):** no sideways scroll.
+  - **Supplier invoice** (in Kiswahili): the supplier balance went from
+    500,000 to 357,000; an offset of 43,000 gave Part paid; the statement
+    line shows; the purchase order PDF downloads.
+
+### Manual follow-up required
+- **Merge order:**
+  - backend: balceinv-api #108 → retarget #109 to `revamp` → #109 →
+    retarget #110 → #110;
+  - frontend: balceinv #88 → retarget #89 → #89;
+  - then a desktop release PR that bumps both submodules.
+- **Before releasing the desktop app:** copy a real shop's `balce.sqlite`
+  that has the books switched on, start the new build against the copy, and
+  check that it reaches schema 67 and that Money → Books still lists the old
+  entries. The app also keeps its own pre-migration copy.
+- **On a phone:**
+  - open an invoice and press Share: WhatsApp must be offered with the PDF
+    attached;
+  - open the PDF and check it reads well on the small screen.
+- **On a real A4 printer:** print an invoice, a delivery note and a
+  purchase order. Check the margins, that the brand colours print, and that
+  the signature lines fall on the page.
+- **Dark mode** was not checked on the new screens.
+- **Known ceiling:** sales reports and the dashboard count till sales only.
+  Invoice revenue shows in Profit & loss, the books and the Invoices
+  summary cards.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.

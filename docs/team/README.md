@@ -16,6 +16,7 @@ Guides for the Balce sales and support team: how to set a shop up, how to answer
 | [Discounts at the till](till-discounts.md) | Planned discounts, cashier discounts and who may give them |
 | [Admin panel](../features/admin-panel.md) | The team page at pos.faltasi.com/admin: signing in with a phone code, shops, trials, password resets, the support inbox |
 | [Features: what changed and why](../features/README.md) | Each feature from 1 to 8 October with screenshots: why it was added, what was removed, how it works. Voiding a sale and refunds are explained there |
+| [Invoices, quotations and delivery notes](invoices.md) | Making, sending and getting paid on invoices; quotations to invoices; delivery notes; billing a supplier; purchase order PDFs |
 | [Where is it?](where-is-it.md) | Quick answers to what testers asked: voiding a sale, held carts, discounts, credit, the Cash flow page, salaries, copying the ID |
 
 ## Planned
