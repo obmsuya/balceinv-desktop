@@ -2991,6 +2991,9 @@ POS_MASTER and wapangaji were read on 2026-09-30.
   and #89 merged in order into revamp; the release PR bumps both
   submodules. Migrations 000064–000067 run on the server after the
   deploy's database backup.
+- The first v2.0.14 deploy stopped at the test step: two tests hard-coded
+  the owner's 61 permissions (now 65). Nothing reached the server. Fixed
+  in balceinv-api #112 by comparing with the permissions table.
 - **Before releasing the desktop app:** copy a real shop's `balce.sqlite`
   that has the books switched on, start the new build against the copy, and
   check that it reaches schema 67 and that Money → Books still lists the old
