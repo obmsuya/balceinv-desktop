@@ -47,6 +47,7 @@ Dates are the desktop release dates. Online had each change on the same day or e
 | **v2.0.12** | 17 Oct 2026 | [Clearing test data, and seeing every shop](clear-data-and-shop-views.md): the owner clears trial data; sales, stock, stock history and alerts per shop or across all shops; bring stock in from another shop. Staff can only open sales from their own shops. |
 | **v2.0.13** | 17 Oct 2026 | Thin scrollbars in the app's colours everywhere. Product import: choose which shop gets the opening stock, the 5 MB / 5,000-row limits shown in the dialog, blank rows no longer counted, clearer message when the whole file cannot be used. **Users** shows which shops each person works in. |
 | **v2.0.14** | 29 Oct 2026 | [Invoices](invoices.md): invoices, proforma invoices, quotations and delivery notes as branded A4 PDFs with a live preview; payments before or after delivery, stock out on delivery; billing a supplier; a PDF for purchase orders. The A4 copy of a till sale uses the new layout too. |
+| Online only | 31 Oct 2026 | A new release shows at once in the browser. Before, the browser could keep the old version until a hard refresh (Ctrl+Shift+R), which is why Invoices did not appear in the sidebar at first. |
 
 > The cashier discount limit was added in v2.0.4 and removed in **v2.0.5** (merged the same day as v2.0.4, 6 Oct). A desktop on v2.0.4 still shows and enforces the limit until it updates.
 
