@@ -3085,8 +3085,13 @@ POS_MASTER and wapangaji were read on 2026-09-30.
       - `docs/testing.md`.
 - [x] **`release.yml`** compiles `config.CompiledBalceSmsApiKey` from the
       `BALCE_SMS_API_KEY` secret.
-- [ ] Merge, release online, and tag the desktop build. This waits for the
-      owner: merging Wapangaji #12 to main deploys it.
+- [x] Released as v2.0.15 with the owner's go-ahead.
+      - **Wapangaji:** #11 and #12 merged, then `deploy.sh` ran: migration
+        0016 applied and the health check passed.
+      - **Balce:** balceinv-api #121–#124 and balceinv #92–#93 merged into
+        revamp; this release bumps both submodules.
+      - **Compose:** `deploy/docker-compose.prod.yml` passes
+        `BALCE_SMS_API_KEY` to the API.
 
 ### Verification performed
 - **Backend on the laptop:**
@@ -3134,14 +3139,14 @@ POS_MASTER and wapangaji were read on 2026-09-30.
      has no mail account or SMS key.
 
 ### Manual follow-up required
-- **Before merging Wapangaji #12:**
-  - generate one random key;
-  - put it in `/opt/wapangaji/.env` as `BALCE_SMS_API_KEY`;
-  - put the same key in `/opt/balce/.env.prod` and in the
-    balceinv-desktop GitHub secret `BALCE_SMS_API_KEY`;
-  - never paste it in chat.
-  - Merging #12 deploys Wapangaji: the cron runs `deploy.sh`, or run it by
-    hand.
+- **Done (2026-11-03): the SMS key.** One generated key went into
+  `/opt/wapangaji/.env`, `/opt/balce/.env.prod` and the balceinv-desktop
+  secret `BALCE_SMS_API_KEY`, without being shown.
+  - Hash prefixes match on both servers.
+  - Backups were kept: `.env.before-balce-sms` and
+    `.env.prod.before-balce-sms`.
+  - The live endpoint answers 403 to a wrong key and 400 to the real key
+    with a bad code, so no SMS was sent while checking.
 - **On a real phone:** ask for a reset code for an owner whose business
   phone is a real Tanzanian number. Check:
   - the SMS arrives within a minute;
