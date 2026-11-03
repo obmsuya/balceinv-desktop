@@ -25,6 +25,7 @@ Written for the owner, the sales and support team, and future developers. Plain 
 | [Owner requests, v2.0.8](owner-requests-v2-0-8.md) | Shop for new stock, deleting an unused shop, capital when the books go on, Cash flow, Faltasi in the top bar and tabs, and three confirm buttons that did nothing |
 | [Faltasi branding](faltasi-branding.md) | Where the app now says it is made by Faltasi, and why each place was chosen |
 | [Invoices](invoices.md) | Invoices, proforma, quotations, delivery notes, supplier invoices and purchase orders as branded PDFs; payments before or after delivery |
+| [Extra, winga lines and forgotten passwords](extra-winga-and-password-reset.md) | Extra (Ziada) to raise a line price, winga lines for brokers behind a Features switch, and resetting a password with a code by email and SMS |
 | [Till and receipts](till-and-receipts.md) | Desktop Print without a printer, receipt PDF and Share, held carts, credit wording, copying the full ID |
 
 ## Release history

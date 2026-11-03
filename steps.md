@@ -3010,6 +3010,155 @@ POS_MASTER and wapangaji were read on 2026-09-30.
   Invoice revenue shows in Profit & loss, the books and the Invoices
   summary cards.
 
+## Phase 44: Extra, winga lines, forgot password, and tests without local Docker (2026-11-03)
+
+### Findings being fixed
+- **No way to raise a price at the till.** Cashiers can only lower one with
+  Discount (`frontend/app/components/pos/LineDiscountPopover.vue`,
+  `backend/internal/sales/pricing.go`). The client sells above list in a busy
+  market.
+- **No way to record a winga (broker) sale.** Every sale line had to be a
+  stocked product (`sale_items.product_id NOT NULL`, migration 000018).
+- **"Forgot password?" led to a 404.** `frontend/app/pages/login.vue:121`
+  links to `/forgot-password`, which did not exist. There was no reset
+  endpoint in `backend/internal/auth`.
+- **Customer order lines took no cashier discount.** `orders/dto.go`
+  `LineRequest` had only `product_id` and `quantity`.
+- **Postgres and Wapangaji tests needed Docker Desktop on the laptop.** It
+  kept crashing and stalling sessions.
+- Owner decisions:
+  - Extra is for every cashier, with no permission.
+  - Winga stays "winga" in both languages, is off by default behind a
+    Features switch, and works for normal sales and orders.
+  - Winga counts in sales and the cash taken, is grouped separately in
+    reports, and its share is cost.
+  - Reset codes also go by SMS through Wapangaji.
+- Issues:
+  - balceinv-api #117, #118, #119, #120;
+  - balceinv #90, #91;
+  - wapangajikiganjani #9, #10.
+
+### Implementation status
+- [x] **CI for every pull request.** Go on SQLite and Postgres 17
+      (balceinv-api #121); Wapangaji check and payments tests on PostGIS
+      (wapangajikiganjani #11).
+      #11 also fixes a Wapangaji test that failed one day in seven: it had a
+      fixed due date, and the landlord's weekly reminder fires when
+      `days_overdue % 7 == 0`.
+- [x] **Extra (balceinv-api #122):**
+      - `items[].extra` on quote, sale and order;
+      - stored per unit, `extra_unit_amount` (migration 000068);
+      - order lines carry the cashier discount and the extra into the
+        collected sale;
+      - the summary has `extra_total`.
+- [x] **Winga lines (balceinv-api #123):**
+      - tables `sale_winga_lines` and `customer_order_winga_lines`, plus
+        `winga_enabled` (migration 000069);
+      - pricing, the EFD payload, the thermal and A4 receipts, and orders;
+      - books: Dr COGS / Cr Cash for the share;
+      - report cost includes the share, and the summary has `winga_total` and
+        `winga_share_total`;
+      - clear-data covers both tables.
+- [x] **Forgot password (balceinv-api #124):**
+      - `internal/passwordreset` and table `password_reset_codes`
+        (migration 000070);
+      - the support SMTP sender is shared as `internal/common/mailer`;
+      - SMS through Wapangaji using `BALCE_SMS_API_KEY`.
+- [x] **Wapangaji SMS endpoint (wapangajikiganjani #12):**
+      - `POST /api/v1/payments/balce/password-reset-sms/` with a fixed
+        message;
+      - capped at 5 per phone an hour and 300 a day (`BalceResetSms`,
+        migration 0016).
+- [x] **Frontend (balceinv #92):**
+      - Extra popover;
+      - winga dialog and cart lines;
+      - Features switch;
+      - order dialog Discount, Extra and winga;
+      - sale details, receipt and order details;
+      - glossary rows.
+- [x] **Frontend (balceinv #93):** `/forgot-password` renders the sign-in
+      page in reset mode.
+- [x] **Docs:**
+      - `docs/features/extra-winga-and-password-reset.md`;
+      - `docs/team/extra-and-winga.md`;
+      - `docs/team/forgot-password.md`;
+      - `docs/testing.md`.
+- [x] **`release.yml`** compiles `config.CompiledBalceSmsApiKey` from the
+      `BALCE_SMS_API_KEY` secret.
+- [ ] Merge, release online, and tag the desktop build. This waits for the
+      owner: merging Wapangaji #12 to main deploys it.
+
+### Verification performed
+- **Backend on the laptop:**
+  - `go build ./...` and `go vet` pass.
+  - `go test ./... -count=1` on SQLite: 38 packages ok.
+  - Only the known Windows-only failures remain: `config` (`/tmp` paths) and
+    the `server` static-file lock.
+- **New tests:**
+  - Extra pricing: amount, percent, the cap, and stacking with the
+    discount.
+  - Any cashier's extra is saved per unit.
+  - Order lines: a discount needs the permission, and both the discount
+    and the extra carry into the sale.
+  - Winga:
+    - off until turned on;
+    - an empty sale is refused, a share above the total is refused, and a
+      blank name is refused;
+    - a mixed sale and a winga-only sale both work, with no stock moved;
+    - summary cost and profit;
+    - books: cash 20,000, COGS 26,000, sales 40,000;
+    - an order is collected into a sale.
+  - Reset:
+    - an unknown email gets the same answer;
+    - the email and the SMS carry the same code;
+    - a wrong code is refused and the right one works;
+    - sessions are revoked, and a used code is refused;
+    - five wrong tries lock the code; three codes an hour.
+- **GitHub CI on Postgres:** balceinv-api #121, #122, #123 and #124 all
+  pass.
+- **GitHub CI on Wapangaji:** #12 passes 67 tests, including the four
+  new `BalcePasswordResetSmsTests`.
+- **Frontend:**
+  - `pnpm build` passes on each branch alone;
+  - the locales check passes (3087 keys on #92; 3075 on #93).
+- **Browser, against a local backend on SQLite, in Kiswahili:**
+  1. Extra 2,000 per item on cooking oil ×2 gives 200,000.
+  2. A winga line, Kava la simu, at 15,000 with a 10,000 share; the till
+     total is 215,000.
+  3. Paid in cash: SALE-20261103-0001.
+  4. The receipt shows both lines and no share.
+  5. Sale details show the Ziada and Winga badges.
+  6. Forgot password: the link opens the page, Send code moves to the code
+     step, and a wrong code shows the error.
+  7. The backend log shows email and SMS skipped, because this local server
+     has no mail account or SMS key.
+
+### Manual follow-up required
+- **Before merging Wapangaji #12:**
+  - generate one random key;
+  - put it in `/opt/wapangaji/.env` as `BALCE_SMS_API_KEY`;
+  - put the same key in `/opt/balce/.env.prod` and in the
+    balceinv-desktop GitHub secret `BALCE_SMS_API_KEY`;
+  - never paste it in chat.
+  - Merging #12 deploys Wapangaji: the cron runs `deploy.sh`, or run it by
+    hand.
+- **On a real phone:** ask for a reset code for an owner whose business
+  phone is a real Tanzanian number. Check:
+  - the SMS arrives within a minute;
+  - it reads "Balce code: …";
+  - the email arrives with the same code.
+- **Desktop app:** after the tagged build, do the same from a desktop
+  install that is online.
+- **Customer orders:** the order dialog's Discount, Extra and winga were
+  built and compiled, but not clicked through in a browser. Open a new
+  order with customer orders on, and check the line total updates after
+  each change.
+- **Dark mode** was not checked on the new popover and dialog.
+- **Known ceilings** (each has a `ponytail:` note):
+  - the winga share is booked as paid from the till's cash;
+  - winga lines cannot be refunded one at a time;
+  - reset SMS go to the business phone, not to each staff member.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
