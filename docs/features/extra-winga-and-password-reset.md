@@ -6,7 +6,24 @@ Three things a client asked for on WhatsApp on 2 November 2026:
 2. **Winga lines:** a winga (a broker) brings a customer and sells something the shop does not stock. The shop takes the money, keeps part, and gives the winga their share.
 3. **Forgot password?** The link on the sign-in page went to a page that did not exist.
 
-For the support answers, see the team guides [Extra and winga lines](../team/extra-and-winga.md) and [Forgotten password](../team/forgot-password.md).
+For the support answers, see the team guides [Extra and Brk lines](../team/extra-and-brk.md) and [Forgotten password](../team/forgot-password.md).
+
+## Update, 4 November 2026: "Brk" and the reports
+
+The client liked winga lines and asked for three changes:
+
+1. **Call it "Brk"** (short for brokerage), not "winga", in both languages. Customers should not understand the word. In Kariakoo a seller says they are fetching the goods "from the store" when they fetch them from another shop.
+2. **Show Brk in the reports.** That money is set aside every evening.
+3. **Show Extra in the reports.** It usually goes to the fundi or salesperson who brought the customer.
+
+What changed:
+
+- **Words people see:** the till, orders, sale details, Settings → Features, error messages, report labels, and the EFD item code (`WINGA` → `BRK`). Tables, JSON fields, error codes and code names stay `winga`, so there is no migration and no API change.
+- **Sales per day** and **Sales per staff member** gain Extra, Brk and Brk share columns, shown only when the period has any.
+- **New report: Brk and Extra** (`GET /api/reports/brk-extra/export`). It has one row per Extra or Brk line, with time, receipt, staff member, item, quantity, Extra, Brk and Brk share, and the totals at the top.
+- **Not recorded:** who brought the customer. The report shows the staff member who made the sale. Upgrade trigger: the owner asks to pay a fundi from the system.
+
+The rest of this page keeps the original wording, "winga", as it was built.
 
 ## Extra (Ziada) on a till line
 
@@ -33,7 +50,7 @@ For the support answers, see the team guides [Extra and winga lines](../team/ext
   - It counts in the sale total, the cash taken, the EFD receipt and every receipt. The customer never sees the share.
   - It takes nothing from stock and adds no stock movement.
   - **The winga share is cost.** Profit is the shop's true margin: price minus share. In the books it is cost of sales, paid out of the till's cash.
-  - **Reports:** the sales summary export lists "Winga sales" and "Winga share" separately.
+  - **Reports:** the sales summary export lists "Brk sales" and "Brk share" separately. Since 4 November, the daily and staff reports have their own columns and there is a Brk and Extra report.
 - **Not possible yet:** refunding a single winga line. Voiding the whole sale undoes it.
 
 ## Forgot password
