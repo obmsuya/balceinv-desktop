@@ -8,6 +8,8 @@
 
 "Brk" is short for brokerage. The client chose it so customers do not understand the word. It used to be called "winga".
 
+Tap the small **?** next to **Add Brk line** or **Brk share** for a short explanation on the screen. The Extra box explains itself at the top.
+
 ## Raise a price with Extra
 
 1. Add the product to the cart.

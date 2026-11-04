@@ -3222,7 +3222,46 @@ POS_MASTER and wapangaji were read on 2026-09-30.
   - open Reports → Brk na Ziada for Today, and check both lines and the totals;
   - check the printed receipt shows neither "Brk" nor the share.
 - **The EFD code is now `BRK`.** On a shop with a fiscal device, send one Brk sale. Check the device accepts the code and prints only the item name.
-- **Ask the client which amount is set aside in the evening:** the whole Brk line, or the Brk share. Both are in the report. If it is one of them, its label can say "to set aside".
+- **Ask the client which amount is set aside in the evening:** the whole Brk line, or the Brk share. Both are in the report.   label can say "to set aside".
+
+## Phase 46: help tips, and an audit of the Extra and Brk state (2026-11-04)
+
+### Findings being fixed
+- **Terms need explaining where they appear:** Extra, Brk and Brk share. Tills are touchscreens, so hover-only tooltips don't work.
+  - Files: `frontend/app/components/pos/{CartPanel,LineExtraPopover,WingaLineDialog}.vue`, `orders/NewOrderDialog.vue`, `sales/SaleDetailsDialog.vue`.
+- **Leftover "winga":** no text people see uses it, in en, sw, Vue templates or backend labels. Only key and field names keep it.
+- **A read-only review found four state bugs:**
+  1. `useTillQuote.ts`: a line counted as priced only if the server's extra or discount was above 0. An Extra or discount priced at 0 then blocked Pay, which did nothing after three tries.
+  2. `pages/pos/index.vue`: after a lost response, `client_ref_reused` locked the cart, and an edit could record the sale twice. This predates Extra and Brk.
+  3. Backend `sales/history_repository.go`, `orders/repository.go` and `reports/repository.go`: Brk-only sales showed 0 units, Brk-only orders 0 lines, and items sold left out Brk.
+  4. `orders/NewOrderDialog.vue`: a slow older quote could overwrite a newer total.
+- Issues: balceinv #98, #99; balceinv-api #129.
+
+### Implementation status
+- [x] **`components/HelpTip.vue`:** opens on tap, with a hover title, above dialogs (`z-[60]`). Used next to Add Brk line (till and New order) and Brk share. The Extra popover gets an explanation line, and the sale-detail badges get hover hints. Text is in `common.help.*` (balceinv #100).
+- [x] **Till prices by the exact request quoted;** `client_ref_reused` clears the cart and points to Sales; New order has a newest-quote guard (balceinv #101).
+- [x] **Brk lines counted** in `unit_count`, `line_count` and `units_sold` (balceinv-api #130).
+- [ ] Merge and release. This waits for the owner.
+
+### Verification performed
+- **Backend:**
+  - `go vet` passes.
+  - `go test ./internal/sales/ ./internal/orders/ ./internal/reports/ ./internal/accounting/` on SQLite: ok.
+  - New checks: the sales list counts 3 units for the mixed sale and 1 for the Brk-only sale; `units_sold` = 4; the Brk-only order has `line_count` = 1.
+  - Postgres CI on #130 passes.
+- **Frontend:**
+  - The locales check passes: 3114 keys on #100, 3109 on #101.
+  - `pnpm build` passes on both.
+- **Browser, local backend on SQLite, in Kiswahili:**
+  - The Brk help next to "Ongeza mstari wa Brk" opens on tap.
+  - The Extra popover shows its explanation.
+  - With Extra 1,500 on cooking oil the till shows TSh 99,500, and Pay opens the payment dialog at that amount.
+  - The Brk share help first drew behind the dialog. With `z-[60]` it shows on top, in dark and light mode.
+  - The test shop has no licence file, so its plan screen was hidden in the browser for this check only. No code was changed for it.
+
+### Manual follow-up required
+- On a real till, tap each help icon with a finger.
+- To check the lost-response fix: pull the network cable just after pressing Complete sale, plug it back in and pay again. The till should clear the cart and say the sale was already saved, and Sales should list it once.
 
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
