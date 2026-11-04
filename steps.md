@@ -3164,6 +3164,66 @@ POS_MASTER and wapangaji were read on 2026-09-30.
   - winga lines cannot be refunded one at a time;
   - reset SMS go to the business phone, not to each staff member.
 
+## Phase 45: "Brk" instead of "winga", and Brk and Extra in the reports (2026-11-04)
+
+### Findings being fixed
+- **The client wants "Brk", not "winga".** "Brk" is short for brokerage.
+  - Customers must not understand the word.
+  - Shown today in:
+    - `frontend/app/locales/{en,sw}/{pos,sales,settings,errors}.json`;
+    - `backend/internal/reports/export.go`;
+    - the EFD code `WINGA` in `backend/internal/sales/fiscal.go`.
+- **Brk and Extra were missing from the reports people use daily.**
+  - Only the sales summary export showed the totals.
+  - The client sets Brk money aside every evening, and pays Extra to the fundi or salesperson who brought the customer.
+  - Files: `backend/internal/reports/{repository,documents}.go` and `frontend/app/pages/reports/index.vue`.
+- Issues: balceinv-api #125, #126; balceinv #94, #95.
+
+### Implementation status
+- [x] **Backend Brk wording** (balceinv-api #127):
+  - report labels;
+  - EFD code `BRK`;
+  - error messages.
+  - Error codes and JSON fields are unchanged.
+- [x] **Backend reports** (balceinv-api #128):
+  - `extra_total`, `winga_total` and `winga_share_total` on the daily and staff rows;
+  - matching PDF and Excel columns, shown only when used;
+  - the new `brk-extra` report.
+- [x] **Frontend Brk wording** (balceinv #96): till, orders, sale details, Settings → Features, errors, and the glossary row.
+- [x] **Frontend report** (balceinv #97): "Brk and Extra" in the Sales group, with updated descriptions for the daily and staff reports.
+- [x] **Docs:**
+  - `docs/team/extra-and-brk.md` (renamed from `extra-and-winga.md`);
+  - an update section in `docs/features/extra-winga-and-password-reset.md`.
+- [x] Merged into revamp (api #127, #128; frontend #96, #97) and released as v2.0.16.
+
+### Verification performed
+- **Backend:**
+  - `go build ./...` and `go vet ./internal/reports/` pass.
+  - `go test ./internal/reports/ ./internal/sales/ ./internal/orders/` on SQLite: ok.
+  - New `TestBrkAndExtraShowInTheReports`, using a sale with an extra of 1,500 × 2 and a 15,000 Brk line with a 10,000 share:
+    - the daily row gives Extra 3,000, Brk 15,000, share 10,000 and cost 28,000;
+    - the staff rows split by cashier;
+    - the Excel sheet lists exactly the two lines;
+    - the Kiswahili daily sheet has "Ziada" and "Sehemu ya Brk";
+    - the PDF renders;
+    - a shop with neither gets the empty text and no Brk columns.
+- **GitHub CI on Postgres 17:** balceinv-api #127 and #128 pass.
+- **PDFs checked by eye:** Brk na Ziada, Mauzo kwa siku and Mauzo kwa mfanyakazi, in Kiswahili.
+- **Frontend:**
+  - The locales check passes: 3106 keys, and 3108 with the report row. It was run through a copy that uses `fileURLToPath`, because the script's `URL.pathname` breaks on Windows paths.
+  - `pnpm build` passes.
+- **Browser, against a local backend on SQLite:**
+  - The Reports page lists "Brk na Ziada" with its description.
+  - The local test shop's subscription had ended, so the app showed the plans screen when Preview was clicked. Nothing was clicked there.
+  - The export the button calls was fetched through the API with the same session. It shows the 3 November test sale: cooking oil, Extra 4,000; Kava la simu, Brk 15,000, share 10,000. The daily report shows 215,000 on 3 November with the same three columns.
+
+### Manual follow-up required
+- **After the desktop release:** sell one Extra line and one Brk line. Then:
+  - open Reports → Brk na Ziada for Today, and check both lines and the totals;
+  - check the printed receipt shows neither "Brk" nor the share.
+- **The EFD code is now `BRK`.** On a shop with a fiscal device, send one Brk sale. Check the device accepts the code and prints only the item name.
+- **Ask the client which amount is set aside in the evening:** the whole Brk line, or the Brk share. Both are in the report. If it is one of them, its label can say "to set aside".
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
