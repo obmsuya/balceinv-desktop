@@ -3222,7 +3222,7 @@ POS_MASTER and wapangaji were read on 2026-09-30.
   - open Reports → Brk na Ziada for Today, and check both lines and the totals;
   - check the printed receipt shows neither "Brk" nor the share.
 - **The EFD code is now `BRK`.** On a shop with a fiscal device, send one Brk sale. Check the device accepts the code and prints only the item name.
-- **Ask the client which amount is set aside in the evening:** the whole Brk line, or the Brk share. Both are in the report.   label can say "to set aside".
+- **Ask the client which amount is set aside in the evening:** the whole Brk line, or the Brk share. Both are in the report. If it is one of them, its label can say "to set aside".
 
 ## Phase 46: help tips, and an audit of the Extra and Brk state (2026-11-04)
 
