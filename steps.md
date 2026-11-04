@@ -3194,7 +3194,7 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - [x] **Docs:**
   - `docs/team/extra-and-brk.md` (renamed from `extra-and-winga.md`);
   - an update section in `docs/features/extra-winga-and-password-reset.md`.
-- [ ] Merge the PRs and release online and on the desktop. This waits for the owner.
+- [x] Merged into revamp (api #127, #128; frontend #96, #97) and released as v2.0.16.
 
 ### Verification performed
 - **Backend:**
