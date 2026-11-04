@@ -3219,7 +3219,7 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 
 ### Manual follow-up required
 - **After the desktop release:** sell one Extra line and one Brk line. Then:
-  - open Reports → Brk na Ziada for Today, and check both lines and the totals;
+  - open Reports → Winga na Ziada for Today, and check both lines and the totals;
   - check the printed receipt shows neither "Brk" nor the share.
 - **The EFD code is now `BRK`.** On a shop with a fiscal device, send one Brk sale. Check the device accepts the code and prints only the item name.
 - **Ask the client which amount is set aside in the evening:** the whole Brk line, or the Brk share. Both are in the report. If it is one of them, its label can say "to set aside".
@@ -3235,12 +3235,15 @@ POS_MASTER and wapangaji were read on 2026-09-30.
   2. `pages/pos/index.vue`: after a lost response, `client_ref_reused` locked the cart, and an edit could record the sale twice. This predates Extra and Brk.
   3. Backend `sales/history_repository.go`, `orders/repository.go` and `reports/repository.go`: Brk-only sales showed 0 units, Brk-only orders 0 lines, and items sold left out Brk.
   4. `orders/NewOrderDialog.vue`: a slow older quote could overwrite a newer total.
-- Issues: balceinv #98, #99; balceinv-api #129.
+- **The owner clarified the wording:** only English says "Brk"; Kiswahili keeps "winga". Phase 45 had changed both languages.
+- Issues: balceinv #98, #99, #102; balceinv-api #129, #131.
 
 ### Implementation status
 - [x] **`components/HelpTip.vue`:** opens on tap, with a hover title, above dialogs (`z-[60]`). Used next to Add Brk line (till and New order) and Brk share. The Extra popover gets an explanation line, and the sale-detail badges get hover hints. Text is in `common.help.*` (balceinv #100).
 - [x] **Till prices by the exact request quoted;** `client_ref_reused` clears the cart and points to Sales; New order has a newest-quote guard (balceinv #101).
 - [x] **Brk lines counted** in `unit_count`, `line_count` and `units_sold` (balceinv-api #130).
+- [x] **Kiswahili says winga:** the app (balceinv #103, plus the help tips on #100) and the report labels (balceinv-api #132). English and the EFD code `BRK` are unchanged.
+  - Checks: the locales check and `pnpm build` pass; `go test ./internal/reports/` passes, and the Kiswahili daily sheet is checked for "Sehemu ya winga".
 - [ ] Merge and release. This waits for the owner.
 
 ### Verification performed
