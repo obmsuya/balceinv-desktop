@@ -22,18 +22,20 @@ A guide for the Balce sales and support team. No technical knowledge needed. But
 | **How customers pay you** | Bank name and account, Lipa number. Printed under the totals of invoices and proforma invoices, so the customer knows where to pay. One payment method per line. |
 | **Default terms** | For example "Payment within 30 days". Filled in on every new invoice; can be changed per invoice. |
 | **Days to pay** | Sets the due date automatically (issue date + days). 30 if left alone. |
+| **Invoice layout (Mpangilio wa ankara)** | Which parts the PDF shows. See section 9. |
 
 The logo and brand colour come from **Settings → Branding**, the same as receipts.
 
 ## 2. Make an invoice
 
 1. **Invoices (Ankara)** → **New (Mpya)** → **Invoice (Ankara)**.
-2. **Bill to (Kwa):** choose the customer, or add a new one there.
+2. **Bill to (Kwa):** choose the customer, or add a new one there. If the customer already has a saved order, press **Fill from a saved order (Jaza kutoka kwenye oda iliyohifadhiwa)** instead: pick the order and the customer, the items, their Discount and Extra, the Brk lines and the order number fill in by themselves.
 3. Check the dates. Type their order number (LPO) in **Their order no.** if they gave one.
 4. **Add the items:**
-   - Search a product: its name, unit and price fill in by themselves. The price can still be changed.
+   - Search a product: its name, unit and price fill in by themselves. **The price is locked** (it shows a lock). It is the product's price, or the wholesale price when the quantity reaches the wholesale minimum, as at the till.
+   - To change what the customer pays, use **Discount (Punguzo)** or **Extra (Ziada)** on that line. Both work per item: 500 off a line of 4 takes 2,000 off. Discount needs the same permission as at the till.
    - **Add typed line (Ongeza mstari wa kuandika)** is for things that are not products: transport, labour, installation. Write what it is and its price.
-   - **Discount (Punguzo)** on a line takes money off that line only.
+   - **Add Brk line (Ongeza mstari wa winga)** is for an item sold through the shop that is not your stock. Type its name, price and the **Brk share** that is paid out. It shows in amber and takes nothing from stock.
 5. **Save draft (Hifadhi rasimu).** The preview on the right shows the exact PDF the customer will receive.
 6. When it is right, press **Save and send (Hifadhi na tuma)**. A sent invoice cannot be edited any more. To change it, cancel it and make a new one.
 
@@ -90,6 +92,16 @@ The supplier's statement shows the invoice and any money they paid.
 
 **Suppliers → the supplier → Orders → open the order → PDF or Share.** The purchase order lists the items and the expected prices, with your logo. It asks the supplier to quote the PO number on their invoice. When the goods come, receive them with **Receive stock (Pokea stoku)** as before.
 
+## 9. Choose what the invoice shows
+
+**Settings (Mipangilio) → Business → Invoice layout (Mpangilio wa ankara).**
+
+- The small picture is the invoice. Tap a part, or its switch, to hide it. A hidden part fades behind stripes and its name is crossed out.
+- The parts are: logo, status stamp, TIN and VRN, "Prepared by", product codes, the unit column, the discount column, amount in words, how to pay, terms, and signature lines.
+- Press **Save layout (Hifadhi mpangilio)**. Every invoice, quotation and delivery note PDF changes at once. **Show everything (Onyesha zote)** brings all parts back.
+
+The PDF itself follows the bordered "tax invoice" style shops know: quantity first, the customer in a box beside the details grid, a totals grid ending in **Outstanding amount**, and the amount in words. A VAT-registered shop's invoice is titled **Tax invoice (Ankara ya kodi)**.
+
 ---
 
 ## Common questions
@@ -108,6 +120,9 @@ The owner, and anyone whose role has the **Invoices** permissions (**Roles**):
 - **Delete** cancels.
 
 Staff only see invoices for the shops they work in.
+
+**Why can't I type a new price on an invoice?**
+The owner asked for it. A product's price is locked so every change shows on the record: use **Discount** to lower it or **Extra** to raise it. Typed lines and Brk lines still take any price.
 
 **The invoice total is not in today's sales on the dashboard.**
 Correct: the dashboard and sales reports count till sales only. Invoice money is on the Invoices page and, if the books are on, in Profit & loss.
