@@ -9,6 +9,7 @@ A cashier can take money off one cart line on the spot: a percent or an amount. 
 | 29 Sep 2026 | v2.0.0 (released 30 Sep) | The till was rebuilt and the old "% off" box was left out on purpose. |
 | 6 Oct 2026 | v2.0.4 | It came back as **Discount (Punguzo)** on each line, behind a permission, with an owner limit. |
 | 6 Oct 2026 (merged), released 7 Oct | v2.0.5 | The limit was removed at the owner's request. |
+| 5 Nov 2026 | v2.0.17 | The discount comes off **each item** on the line, the same way Extra is added to each item. Invoices use it too. |
 
 For the support answer, see the team guide [Discounts at the till](../team/till-discounts.md).
 
@@ -40,12 +41,12 @@ The owner asked for it. It came back in v2.0.4, built the safe way:
 1. Add the product to the cart.
 2. On that line, press **Discount (Punguzo)**.
 3. Choose **Percent (Asilimia)** or the currency (for example TZS).
-4. Type the number. The box shows **Takes {amount} off this line (Inapunguza {amount} kwenye bidhaa hii)**.
+4. Type the number, or tap a quick 5%, 10%, 15% or 20%. The box shows the price each before and after, the line total, and **Customer saves (Mteja anaokoa)**, for example **500 × 3 = 1,500**.
 5. Press **Apply (Weka)**.
 
 ![Discount box on a cart line](images/discount-popover.png)
 
-The line now shows the discount in green, for example **−10%**. To change it, press it again. To take it off, press it and choose **Remove (Ondoa)**.
+The line now shows the discount in green, for example **−10%** or **−500 each (−500 kila kimoja)**. To change it, press it again. To take it off, press it and choose **Remove (Ondoa)**.
 
 ## Who can give one
 
@@ -61,8 +62,8 @@ The line now shows the discount in green, for example **−10%**. To change it, 
 | Rule | Detail |
 | :--- | :--- |
 | One line at a time | A cashier discount belongs to one cart line, not to the whole sale. |
-| Percent or amount | Percent: from 0.01% up to 100%. Amount: any amount. |
-| Works out from the full line | The percent is taken from the line's full price (quantity × price, add-ons included). |
+| Percent or amount | Percent: from 0.01% up to 100%. Amount: taken off each item, never more than the price each. |
+| Works out per item | The discount is worked out on one item (price, add-ons and Extra included) and multiplied by the quantity. 500 off 3 bags takes 1,500 off the line. |
 | Stacks on planned discounts | A planned discount from the **Discounts (Punguzo)** page applies first. The cashier discount comes on top. |
 | Never below zero | If the two together are more than the line, the line stops at 0. |
 | Works on wholesale lines | Planned discounts skip wholesale-priced lines; a cashier discount does not. |

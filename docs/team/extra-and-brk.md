@@ -27,7 +27,7 @@ To take it off, press the badge again and press **Remove (Ondoa)**.
 4. Type the **Brk share**: the part paid out, to the broker or the other shop. Leave it empty if the shop keeps it all.
 5. Press **Add to cart (Weka kwenye kikapu)**, then take payment as usual.
 
-The same button is on **New order** for customer orders.
+The same button is on **New order** for customer orders and in the invoice editor. On an invoice, the Brk share is counted as cost when the invoice is marked delivered.
 
 ## See Extra and Brk in reports
 
@@ -46,3 +46,4 @@ Go to **Reports (Ripoti)** and pick the period, for example **Today (Leo)** for 
 - **Can I refund a Brk line?** Not on its own yet. Void the sale and sell again.
 - **The Add Brk line button is missing.** The owner has not turned the switch on, or the till page needs a refresh after saving.
 - **Why is Discount missing but Extra is there?** Discount needs the till discount permission on the person's role. Extra does not.
+- **Does Discount come off each item?** Yes, since v2.0.17, the same as Extra. 500 off a line of 3 takes 1,500 off.

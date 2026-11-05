@@ -3266,6 +3266,76 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - On a real till, tap each help icon with a finger.
 - To check the lost-response fix: pull the network cable just after pressing Complete sale, plug it back in and pay again. The till should clear the cart and say the sale was already saved, and Sales should list it once.
 
+## Phase 47: client feedback on discounts, the order popup and invoices (2026-11-05)
+
+### Findings being fixed
+- **"Discount deducts the total instead of per item."** A TZS discount came off the whole line once. It now comes off each item, like Extra, at the till, on orders and on invoices.
+  - Files: `backend/internal/sales/pricing.go`, `frontend/app/components/pos/LineDiscountPopover.vue`, `frontend/app/composables/useCart.ts`.
+- **"The order popup shows half and scrolls left and right."**
+  - Cause: the dialog base is a CSS grid with one implicit auto column. A track never shrinks below its items' min-content, and a truncated long product name has a min-content as wide as the whole name.
+  - Measured at 375 px: content 717 px wide in a 366 px box.
+  - Files: `frontend/app/components/ui/{dialog/DialogContent,alert-dialog/AlertDialogContent}.vue`.
+- **"A button in the invoice window to fill it from a saved order."**
+  - Files: `frontend/app/components/invoices/{InvoiceEditorDialog,OrderPickerDialog}.vue`.
+- **"On invoices the user must not change the price in the box; use Discount or Extra."**
+  - Product prices are locked on the server and in the editor, with the till's wholesale rule.
+  - Files: `backend/internal/invoices/bill_service.go`.
+- **"Add Brk to invoices."** Brk lines with a Brk share, booked as cost when the invoice is delivered.
+  - Files: `backend/internal/invoices/*`, `backend/internal/accounting/invoice_postings.go`, migration 000071.
+- **The invoice design the client liked** (bordered tax invoice), and **switches to remove parts of it**.
+  - Files: `backend/internal/documents/invoice_pdf.go`, migration 000072, `frontend/app/components/settings/InvoiceLayoutCard.vue`.
+- **Found while testing:** the New menu on Invoices showed the raw key `invoices.kindHelp.supplier_invoice`.
+- Issues: balceinv-api #133, #134, #135; balceinv #104, #105, #106, #107.
+
+### Implementation status
+- [x] **Discount each** (balceinv-api #136, balceinv #108):
+  - The server takes `DiscountPerItem` × quantity.
+  - The discount box shows the price each before and after, the line total and "Customer saves 500 × 3 = 1,500", with quick % chips.
+  - Carts held before this are converted once.
+- [x] **Dialogs keep inside the screen** (balceinv #109): `grid-cols-[minmax(0,1fr)]` on both dialog bases.
+- [x] **Invoice lines** (balceinv-api #137):
+  - A product price sent for a product line → `invoice_price_locked`.
+  - Wholesale price from the minimum quantity.
+  - `extra` and `discount` work per item; discount needs `till_discounts:create`.
+  - Brk lines carry `is_winga` and `winga_share`; convert copies lines exactly.
+- [x] **Invoice editor** (balceinv #110): Fill from a saved order, locked price box with a lock, Discount and Extra popovers, amber Brk rows, and a details sheet that shows Brk and Extra.
+- [x] **Classic layout and hidden parts** (balceinv-api #138, balceinv #111):
+  - The PDF is rebuilt after the photo.
+  - `invoice_hidden_parts` holds 11 parts.
+  - Settings has a Tailwind drawing of the invoice: tap a part to hide it.
+- [x] The supplier invoice help line in en and sw (in balceinv #110).
+- [ ] Merge and release v2.0.17. This waits for the owner.
+
+### Verification performed
+- **Backend:**
+  - `go build ./...` and `go vet` pass.
+  - `go test ./...` on SQLite passes, apart from two packages:
+    - `internal/catalog` timed out once under load, and passes alone;
+    - `internal/config` fails the same way on unchanged `revamp` (Windows paths in its desktop path test), so not from this work.
+  - New tests:
+    - 500 off each of 4 = 2,000; 10% each of 3 × 3,333 = 999; an amount above the price stops at the price;
+    - an invoice line with Extra 1,000 and 10% off each, and a Brk line with an 8,000 share. Stock moves only for the product, and COGS = 3 × 60,000 + 8,000;
+    - a clerk without the discount permission is refused;
+    - 9 and 10 bags take the retail and wholesale price;
+    - hidden parts save, reject unknown names, and leave terms and signatures off the PDF.
+  - Sample PDFs (full, trimmed and a Swahili delivery note) were rendered and checked by eye.
+- **Frontend:**
+  - The locales check passes: 3127 keys on #110, 3138 on #111.
+  - `pnpm build` passes.
+- **Browser** (local backend on SQLite, in Kiswahili; the plan screen was hidden in the browser only, because the test shop has no licence):
+  - **Till, 3 × cooking oil, TZS 500 off:** the box showed 98,000 → 97,500, a line of 3 = 292,500, and the customer saves 500 × 3 = 1,500. The badge read "−TSh 500 kila kimoja". The server quote gave `manual_discount_amount` 1,500 and a total of 292,500.
+  - **Fill from a saved order** (ORD-000001: 2 oils with Extra 2,000 and 1,000 off each, plus a Brk line at 4 × 55,000 with a 20,000 share):
+    - it filled the customer, ORD-000001 as the reference, the note, a locked 98,000 + 2,000, "−TSh 1,000 kila kimoja" and the amber Brk row;
+    - the total was 418,000, the same as the order;
+    - the saved INV-2026-0005 had the same line amounts on the server, and the live preview showed the new layout.
+  - **Invoice layout:** hiding logo, status, signatures and terms struck them out, faded the drawing, said "Sehemu 7 kati ya 11" and saved `["logo","status","signatures","terms"]`.
+  - **New order popup at 375 px with a long product name:** content 366 px in a 366 px box; 717 px with the fix taken off.
+
+### Manual follow-up required
+- **Look at an invoice PDF:** print one on a real A4 printer, and open one on a phone after sharing it on WhatsApp. The borders and the totals grid should be crisp, and nothing cut off on the right.
+- **Old drafts:** drafts made before this release with a hand-typed product price take the product price the next time they are saved. Check open drafts after updating.
+- **Screenshots:** `docs/features/images/discount-popover.png` still shows the old discount box; retake it on a real till.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
