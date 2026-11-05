@@ -3244,7 +3244,7 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - [x] **Brk lines counted** in `unit_count`, `line_count` and `units_sold` (balceinv-api #130).
 - [x] **Kiswahili says winga:** the app (balceinv #103, plus the help tips on #100) and the report labels (balceinv-api #132). English and the EFD code `BRK` are unchanged.
   - Checks: the locales check and `pnpm build` pass; `go test ./internal/reports/` passes, and the Kiswahili daily sheet is checked for "Sehemu ya winga".
-- [ ] Merge and release. This waits for the owner.
+- [x] Merged into revamp and released in v2.0.17 (2026-11-05).
 
 ### Verification performed
 - **Backend:**
@@ -3304,7 +3304,7 @@ POS_MASTER and wapangaji were read on 2026-09-30.
   - `invoice_hidden_parts` holds 11 parts.
   - Settings has a Tailwind drawing of the invoice: tap a part to hide it.
 - [x] The supplier invoice help line in en and sw (in balceinv #110).
-- [ ] Merge and release v2.0.17. This waits for the owner.
+- [x] Merged into revamp and released in v2.0.17 (2026-11-05).
 
 ### Verification performed
 - **Backend:**
