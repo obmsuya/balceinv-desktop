@@ -174,3 +174,15 @@ Pushing an explicit release tag matching the 'v*' pattern launches the environme
 git tag v0.1.0
 git push origin v0.1.0
 ```
+
+### Windows Defender false alarms
+
+The Windows build is not code-signed yet, so Defender judges it by how it looks. To keep it looking like what it is:
+
+- The release workflow gives `backend.exe` its Windows file details (publisher, product, version, icon and manifest) from `tauri.conf.json`, using `src-tauri/windows/backend-resources.ps1`. The build fails if they are missing.
+  - To check by hand on Windows: run `./src-tauri/windows/backend-resources.ps1`, build `cmd/server`, and read `(Get-Item backend.exe).VersionInfo`.
+- Keep the installer hook (`src-tauri/windows/hooks.nsh`) free of `-ExecutionPolicy Bypass`, hidden downloads and similar tricks.
+- After each release, submit the new `_x64-setup.exe` to Microsoft at microsoft.com/wdsi/filesubmission → Software developer → Incorrect detection.
+- A client whose Defender already flagged a file should check its SHA-256 (`Get-FileHash`) against the release's file, then use Windows Security → Protection history → Allow on device.
+
+The lasting fix is an Authenticode certificate (Certum's cloud certificate) that signs the app, `backend.exe` and both installers during the build.
