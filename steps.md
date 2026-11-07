@@ -3351,7 +3351,7 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - [x] The release workflow runs the script, then **fails the build** if `backend.exe` has no company or version, and prints `app.exe`'s details after the Tauri build.
 - [x] `-ExecutionPolicy Bypass` removed from the hook; the command is unchanged otherwise.
 - [x] `Cargo.toml`: `description = "Balce Inventory desktop app"`, `authors = ["Faltasi"]`.
-- [ ] Release 2.0.18 with these changes. This waits for the owner.
+- [x] Released in 2.0.18 (7 Nov 2026).
 - [ ] Authenticode signing (Certum cloud certificate). This waits for the owner to buy and verify the certificate.
 
 ### Verification performed
@@ -3392,7 +3392,7 @@ The owner heard the two reports give different totals. They did (balceinv-api #1
 - [x] **Sales report:** a **Less: refunds (Toa: marejesho)** row, with VAT shown net of refund VAT.
 - [x] Dashboard best sellers stay stock products only.
 - [x] Docs: `docs/features/refunds.md`, `docs/features/extra-winga-and-password-reset.md`.
-- [ ] Merge and release. This waits for the owner.
+- [x] Merged (balceinv-api #140) and released in 2.0.18 (7 Nov 2026).
 
 ### Verification performed
 - New `TestProductsSoldAddsUpToTheSalesReport` (SQLite locally; Postgres in the API's CI). It uses a VAT shop with prices that round differently per line, a sale with a Brk line, a mixed sale and a restocked refund of one soda.
