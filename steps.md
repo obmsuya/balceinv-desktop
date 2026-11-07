@@ -3336,6 +3336,82 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - **Old drafts:** drafts made before this release with a hand-typed product price take the product price the next time they are saved. Check open drafts after updating.
 - **Screenshots:** `docs/features/images/discount-popover.png` still shows the old discount box; retake it on a real till.
 
+## Phase 48: Windows Defender flags the installer (2026-11-06)
+
+### Findings being fixed
+- **Defender quarantined `Balce.Inventory_2.0.16_x64-setup.exe` and `app.exe` as `Trojan:Win32/Bearfoos.A!ml`** on a client PC. `!ml` is a machine-learning guess, not a known-malware match. The release pipeline shows no tampering; the build is unsigned (desktop #78).
+  - `backend.exe` had no Windows file details: no company, product, version, description, icon or manifest. It runs hidden and opens a network port. That pattern is what the model distrusts.
+  - The installer's pre-install hook ran PowerShell with `-ExecutionPolicy Bypass`. That switch is common in malware droppers, and it does nothing for `-Command` (execution policy only applies to script files). File: `src-tauri/windows/hooks.nsh`.
+  - `src-tauri/Cargo.toml` still had the template's `"A Tauri App"` by `"you"`.
+
+### Implementation status
+- [x] `src-tauri/windows/backend-resources.ps1` writes `backend/cmd/server/rsrc_windows_amd64.syso` before the Windows sidecar is built. It reads the version, publisher, product name and copyright from `tauri.conf.json`, and adds the app icon and an `asInvoker` manifest.
+  - Microsoft's `rc.exe` compiles the resources. `cvtres.exe` was tried first, but Go's linker refuses its `@comp.id` and `@feat.00` symbols ("sectnum < 0").
+  - `src-tauri/windows/res2syso.go` (stdlib only) turns the `.res` file into a one-section COFF object that Go links. No tool is downloaded.
+- [x] The release workflow runs the script, then **fails the build** if `backend.exe` has no company or version, and prints `app.exe`'s details after the Tauri build.
+- [x] `-ExecutionPolicy Bypass` removed from the hook; the command is unchanged otherwise.
+- [x] `Cargo.toml`: `description = "Balce Inventory desktop app"`, `authors = ["Faltasi"]`.
+- [x] Released in 2.0.18 (7 Nov 2026).
+- [ ] Authenticode signing (Certum cloud certificate). This waits for the owner to buy and verify the certificate.
+
+### Verification performed
+- `backend-resources.ps1`, then `go build -trimpath -ldflags="-H=windowsgui -s -w" ./cmd/server` on Windows:
+  - the build passed, with 9 resources written;
+  - `(Get-Item backend.exe).VersionInfo` read CompanyName "Faltasi", FileDescription "Balce Inventory local server", ProductName "Balce Inventory", version 2.0.17, "© 2026 Faltasi", OriginalFilename "backend.exe";
+  - the first try showed "Â©", because Windows PowerShell 5.1 read the config file as ANSI. Fixed with `-Encoding UTF8`.
+- The built `backend.exe` started and was still running after 4 seconds, so the resources don't break it.
+  - The run created an empty `balce.sqlite` in `%APPDATA%\com.balceinv.app` on the dev PC; those files were removed again.
+- `go vet` passes on `res2syso.go`; `cargo metadata` reads the new description and author.
+- The new hook command, run against a path that doesn't exist, exits 0.
+- The workflow itself runs only on a tag, so its new steps are checked on the next release.
+- Earlier, an installed `app.exe` from an old build already had Tauri's details (Balce Inventory, company "balceinv"); only `backend.exe` was blank.
+
+### Manual follow-up required
+- **After every release until the build is signed:** submit the new `…_x64-setup.exe` at microsoft.com/wdsi/filesubmission as "Software developer → Incorrect detection". This takes about 5 minutes.
+- **On the 2.0.18 release run:** in the Windows job, the step "Check the Go Sidecar's Windows file details" should list Faltasi, Balce Inventory and 2.0.18.
+- **On a Windows PC with 2.0.18 installed:** right-click `%LOCALAPPDATA%\Balce Inventory\backend.exe` → Properties → Details. It should show the same details and the app icon.
+- **On a PC that flagged 2.0.16:** after verifying the file hash, restore it from Windows Security → Protection history → Allow on device, then update to 2.0.18.
+- No change can promise Defender will never guess wrong. Only a code-signing certificate gives the files a known publisher.
+
+## Phase 49: Products sold and the Sales report disagree (2026-11-07)
+
+### Findings being fixed
+The owner heard the two reports give different totals. They did (balceinv-api #139):
+- **Brk lines:** Products sold left them out; the Sales report counts them in takings and their Brk share in cost.
+- **Refunds:** the Sales report takes them off net sales and cost; Products sold ignored them, so a refunded item still counted as sold.
+- **VAT:** the Sales report rounds VAT once per sale, half up; Products sold rounded each line down, a few shillings apart.
+- **Found while fixing:** the Sales report export **returned 500 for any period with a refund**. Its net sales subtracts refunds, but the statement said net = takings − VAT, so `Statement.Check()` refused it.
+- File: `backend/internal/reports/{repository,service,documents,export,dto}.go`.
+
+### Implementation status
+- [x] **Products sold** (balceinv-api #140):
+  - one row per Brk item, with SKU "Brk"/"Winga" and the Brk share as cost;
+  - refund lines in the period taken off each product (quantity, money, and the cost when restocked);
+  - each sale's and refund's VAT shared across its lines with running totals, so net sales add up exactly;
+  - a note on the sheet says the totals equal the Sales report after refunds.
+- [x] **Sales report:** a **Less: refunds (Toa: marejesho)** row, with VAT shown net of refund VAT.
+- [x] Dashboard best sellers stay stock products only.
+- [x] Docs: `docs/features/refunds.md`, `docs/features/extra-winga-and-password-reset.md`.
+- [x] Merged (balceinv-api #140) and released in 2.0.18 (7 Nov 2026).
+
+### Verification performed
+- New `TestProductsSoldAddsUpToTheSalesReport` (SQLite locally; Postgres in the API's CI). It uses a VAT shop with prices that round differently per line, a sale with a Brk line, a mixed sale and a restocked refund of one soda.
+  - **Before the fix:** product takings were 16,020 against 31,020 − 1,190.
+  - **After:**
+    - product takings = Sales report takings − refunds;
+    - net sales, cost and gross profit are equal to the shilling;
+    - the Brk row is 15,000 with a 10,000 cost;
+    - soda is 4 units after the refund;
+    - best sellers have 2 stock products;
+    - both reports export as xlsx and as a Kiswahili PDF.
+- The Sales report bug was confirmed by taking the new refunds row out and re-running: the export returned 500.
+- `go vet ./internal/reports/`, and `go test ./internal/reports/ ./internal/documents/ ./internal/sales/`, pass on SQLite.
+
+### Manual follow-up required
+- On a shop with refunds and Brk sales, export both reports for the same week. Then check two things:
+  - Products sold "Takings" total = Sales report takings minus "Less: refunds";
+  - net sales and gross profit are the same in both.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.

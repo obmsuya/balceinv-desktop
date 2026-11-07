@@ -44,6 +44,11 @@ jobs:
         run: mkdir -p src-tauri/bin
 
       # 2. Compile Go Sidecars from within the backend directory
+      - name: Add Windows file details to the Go Sidecar
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: ./src-tauri/windows/backend-resources.ps1
+
       - name: Build Go Sidecar (Windows)
         if: matrix.platform == 'windows-latest'
         shell: bash
@@ -52,6 +57,14 @@ jobs:
         run: |
           cd backend
           go build -trimpath -ldflags="-H=windowsgui $SIDECAR_LDFLAGS" -o ../src-tauri/bin/backend-x86_64-pc-windows-msvc.exe ./cmd/server
+
+      - name: Check the Go Sidecar's Windows file details
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $fileDetails = (Get-Item src-tauri/bin/backend-x86_64-pc-windows-msvc.exe).VersionInfo
+          $fileDetails | Format-List CompanyName, FileDescription, ProductName, ProductVersion, LegalCopyright, OriginalFilename
+          if (-not $fileDetails.CompanyName -or -not $fileDetails.ProductVersion) { throw 'backend.exe was built without Windows file details' }
 
       - name: Build Go Sidecar (Ubuntu)
         if: matrix.platform == 'ubuntu-22.04'
@@ -118,3 +131,8 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Show the Windows app's file details
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: (Get-Item src-tauri/target/release/app.exe).VersionInfo | Format-List CompanyName, FileDescription, ProductName, ProductVersion, LegalCopyright, OriginalFilename
