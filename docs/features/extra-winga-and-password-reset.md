@@ -50,7 +50,7 @@ The rest of this page keeps the original wording, "winga", as it was built.
   - It counts in the sale total, the cash taken, the EFD receipt and every receipt. The customer never sees the share.
   - It takes nothing from stock and adds no stock movement.
   - **The winga share is cost.** Profit is the shop's true margin: price minus share. In the books it is cost of sales, paid out of the till's cash.
-  - **Reports:** the sales summary export lists "Brk sales" and "Brk share" separately. Since 4 November, the daily and staff reports have their own columns and there is a Brk and Extra report.
+  - **Reports:** the sales summary export lists "Brk sales" and "Brk share" separately. Since 4 November, the daily and staff reports have their own columns and there is a Brk and Extra report. Since 7 November, **Products sold** lists each Brk item by name too (SKU "Brk"), with the Brk share as its cost, so its totals match the Sales report.
 - **Not possible yet:** refunding a single winga line. Voiding the whole sale undoes it.
 
 ## Forgot password
