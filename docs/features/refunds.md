@@ -95,6 +95,9 @@ A refund **off the customer's debt** lowers what the customer owes by that amoun
 
 - **Sales History (Historia ya Mauzo):** the **Takings (Makusanyo)** card still shows the full takings of the sales in the list. Below it, **Refunds: {amount} (Zilizorudishwa: {amount})** shows what was refunded on those sales.
 - **Reports, sales summary:** refunds are counted on the day they were made. Net sales = sales − VAT − (refunds − their VAT). The cost of restocked items comes off the cost of goods, so gross profit drops only by what was really lost. A non-restocked item keeps its cost, so it lowers profit.
+- **Reports, from 7 November 2026:**
+  - The Sales report shows **Less: refunds (Toa: marejesho)** under takings, and VAT net of the refunds' VAT. Before this, a period with a refund could not be exported.
+  - **Products sold (Bidhaa zilizouzwa)** takes each refunded item off its product: quantity, money, and cost when restocked. Its totals equal the Sales report after refunds.
 
 ### EFD (fiscal receipts)
 

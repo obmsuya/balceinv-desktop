@@ -3373,6 +3373,45 @@ POS_MASTER and wapangaji were read on 2026-09-30.
 - **On a PC that flagged 2.0.16:** after verifying the file hash, restore it from Windows Security → Protection history → Allow on device, then update to 2.0.18.
 - No change can promise Defender will never guess wrong. Only a code-signing certificate gives the files a known publisher.
 
+## Phase 49: Products sold and the Sales report disagree (2026-11-07)
+
+### Findings being fixed
+The owner heard the two reports give different totals. They did (balceinv-api #139):
+- **Brk lines:** Products sold left them out; the Sales report counts them in takings and their Brk share in cost.
+- **Refunds:** the Sales report takes them off net sales and cost; Products sold ignored them, so a refunded item still counted as sold.
+- **VAT:** the Sales report rounds VAT once per sale, half up; Products sold rounded each line down, a few shillings apart.
+- **Found while fixing:** the Sales report export **returned 500 for any period with a refund**. Its net sales subtracts refunds, but the statement said net = takings − VAT, so `Statement.Check()` refused it.
+- File: `backend/internal/reports/{repository,service,documents,export,dto}.go`.
+
+### Implementation status
+- [x] **Products sold** (balceinv-api #140):
+  - one row per Brk item, with SKU "Brk"/"Winga" and the Brk share as cost;
+  - refund lines in the period taken off each product (quantity, money, and the cost when restocked);
+  - each sale's and refund's VAT shared across its lines with running totals, so net sales add up exactly;
+  - a note on the sheet says the totals equal the Sales report after refunds.
+- [x] **Sales report:** a **Less: refunds (Toa: marejesho)** row, with VAT shown net of refund VAT.
+- [x] Dashboard best sellers stay stock products only.
+- [x] Docs: `docs/features/refunds.md`, `docs/features/extra-winga-and-password-reset.md`.
+- [ ] Merge and release. This waits for the owner.
+
+### Verification performed
+- New `TestProductsSoldAddsUpToTheSalesReport` (SQLite locally; Postgres in the API's CI). It uses a VAT shop with prices that round differently per line, a sale with a Brk line, a mixed sale and a restocked refund of one soda.
+  - **Before the fix:** product takings were 16,020 against 31,020 − 1,190.
+  - **After:**
+    - product takings = Sales report takings − refunds;
+    - net sales, cost and gross profit are equal to the shilling;
+    - the Brk row is 15,000 with a 10,000 cost;
+    - soda is 4 units after the refund;
+    - best sellers have 2 stock products;
+    - both reports export as xlsx and as a Kiswahili PDF.
+- The Sales report bug was confirmed by taking the new refunds row out and re-running: the export returned 500.
+- `go vet ./internal/reports/`, and `go test ./internal/reports/ ./internal/documents/ ./internal/sales/`, pass on SQLite.
+
+### Manual follow-up required
+- On a shop with refunds and Brk sales, export both reports for the same week. Then check two things:
+  - Products sold "Takings" total = Sales report takings minus "Less: refunds";
+  - net sales and gross profit are the same in both.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
