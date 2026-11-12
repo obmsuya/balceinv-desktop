@@ -3435,7 +3435,7 @@ The owner heard the two reports give different totals. They did (balceinv-api #1
   - Take payment is the main button and leaves the order where it is. Hand over is separate and asks before the collection date.
   - The locale check works on Windows.
 - [x] Docs: `docs/features/order-drafts-and-payment.md`.
-- [ ] Merge and release. This waits for the owner.
+- [x] Merged (balceinv-api #142, balceinv #113) and released in 2.0.19 (12 Nov 2026).
 
 ### Verification performed
 - **Backend:**

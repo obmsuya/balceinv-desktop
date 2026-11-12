@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "2.0.18"
+version = "2.0.19"
 description = "Balce Inventory desktop app"
 authors = ["Faltasi"]
 license = ""
