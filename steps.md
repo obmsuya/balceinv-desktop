@@ -3412,6 +3412,61 @@ The owner heard the two reports give different totals. They did (balceinv-api #1
   - Products sold "Takings" total = Sales report takings minus "Less: refunds";
   - net sales and gross profit are the same in both.
 
+## Phase 50: order drafts, and taking payment without handing over (2026-11-11)
+
+### Findings being fixed
+- **"Save an order as a draft and edit it before finishing."** It wasn't possible:
+  - saving an order numbered it, reserved its stock and took its deposit at once;
+  - the API had no edit (`backend/internal/server/routes.go`, `backend/internal/orders/service.go`).
+- **"When the customer pays, the order goes straight to Collected, even with a later date; it should stay in Ready."**
+  - The order sheet's main button, "Kabidhi · pokea {amount}", took the payment *and* handed the order over (`frontend/app/components/orders/OrderDetailsSheet.vue`).
+  - The only pay-only path was the small "Ongeza malipo ya awali" button.
+  - Hand-over never checked the collection date.
+- **Found while fixing:** `scripts/locales.check.ts` failed on Windows paths with spaces (`URL.pathname`).
+- Issues: balceinv-api #141, balceinv #112.
+
+### Implementation status
+- [x] **Backend (balceinv-api #142):**
+  - Migration 000073 adds `customer_orders.is_draft`. It's a column because the inline status CHECK would need a SQLite table rebuild, which cascade-deletes order lines and payments.
+  - `POST /api/orders` accepts `draft`. `PUT /api/orders/:id` edits a draft, and confirms it with `draft: false`.
+  - Cancel discards a draft. Reserved stock in the books leaves drafts out.
+- [x] **Frontend (balceinv #113):**
+  - Save as draft, a Drafts tab, Continue editing and Discard.
+  - Take payment is the main button and leaves the order where it is. Hand over is separate and asks before the collection date.
+  - The locale check works on Windows.
+- [x] Docs: `docs/features/order-drafts-and-payment.md`.
+- [x] Merged (balceinv-api #142, balceinv #113) and released in 2.0.19 (12 Nov 2026).
+
+### Verification performed
+- **Backend:**
+  - `go build ./...` and `go vet` pass for orders, accounting and server.
+  - The new `TestDraftOrdersWaitUntilConfirmed` checks:
+    - a draft moves no stock and refuses a deposit;
+    - the draft and open filters;
+    - deposit, ready and collect on a draft return `invalid_status`;
+    - editing needs `orders:create`;
+    - an edit changes the customer, lines and note and clears the date;
+    - confirming keeps the number, takes the deposit and reserves stock;
+    - no edits after confirming;
+    - discarding leaves the stock unchanged.
+  - `go test` for orders, accounting, cleardata, customers and invoices passes on SQLite. Postgres runs in CI.
+  - `internal/server`'s static-files test fails on Windows with or without this change, because a temp file stays locked.
+- **Frontend:** `node scripts/locales.check.ts` (3185 keys) and `pnpm build` pass.
+- **Browser** (local backend on a fresh SQLite, licence check off):
+  1. Saving a draft kept all 5 cakes on the shelf.
+  2. Editing and confirming with 3 cakes, 4 candles, collect by 20 Nov and a 20,000 deposit gave a Waiting order with 57,000 owed, and left 2 cakes and 36 candles on the shelf.
+  3. Mark ready, then Take payment, which was prefilled with 57,000. After paying by mobile money the order stayed **ready**, with balance 0 and no sale.
+  4. Hand over showed the 20 Nov warning. Hand over today and the confirm collected it as SALE-20261111-0001.
+  5. Discarding a second draft cancelled it as "Draft discarded" and left the stock unchanged.
+  6. At 375 px the dialog doesn't scroll sideways.
+
+### Manual follow-up required
+- **On a real till, in Kiswahili:**
+  1. Make a draft, close the app, reopen it, then continue editing and save it as an order.
+  2. Take full payment on a Ready order with a future date. It must stay **Tayari**.
+  3. Press **Kabidhi oda**: the date warning must show.
+- Tell staff that **Pokea malipo** is now the button for taking money, and **Kabidhi** is only for when the customer collects.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
