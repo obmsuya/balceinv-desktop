@@ -72,6 +72,8 @@ The message **Refund recorded (Urejeshaji umerekodiwa)** appears. The sale now s
 
 If **Put the items back in stock** is ticked, each refunded quantity goes back to the shop that made the sale. If not, stock does not change: the item is treated as lost.
 
+From 13 November 2026 the line in **Stock → History** says **Customer return (Mteja amerudisha)**, with the receipt number as its reference. A void that puts stock back says **Sale voided (Mauzo yamebatilishwa)**. Before this, both showed as **Sale (Mauzo)** with a plus quantity, and an update relabels those older lines. Both can be picked in the history's reason filter.
+
 ### The books
 
 When the books are on, each refund posts one entry on the refund day:
@@ -93,11 +95,17 @@ A refund **off the customer's debt** lowers what the customer owes by that amoun
 
 ### Totals and reports
 
-- **Sales History (Historia ya Mauzo):** the **Takings (Makusanyo)** card still shows the full takings of the sales in the list. Below it, **Refunds: {amount} (Zilizorudishwa: {amount})** shows what was refunded on those sales.
+- **Sales History (Historia ya Mauzo):**
+  - The **Takings (Makusanyo)** card still shows the full takings of the sales in the list.
+  - Below it, **Refunds: {amount} (Zilizorudishwa: {amount})** shows the refunds **given in the chosen dates**, from 13 November 2026. Before then it showed refunds on the sales *made* in those dates, so a return today for an older sale did not show when filtering on today.
+  - A refunded receipt shows **Refunded (Pesa imerudishwa)** in the list, or **Refunded {amount} (Imerudishwa {amount})** when only part came back.
 - **Reports, sales summary:** refunds are counted on the day they were made. Net sales = sales − VAT − (refunds − their VAT). The cost of restocked items comes off the cost of goods, so gross profit drops only by what was really lost. A non-restocked item keeps its cost, so it lowers profit.
 - **Reports, from 7 November 2026:**
   - The Sales report shows **Less: refunds (Toa: marejesho)** under takings, and VAT net of the refunds' VAT. Before this, a period with a refund could not be exported.
   - **Products sold (Bidhaa zilizouzwa)** takes each refunded item off its product: quantity, money, and cost when restocked. Its totals equal the Sales report after refunds.
+- **Reports, from 13 November 2026:**
+  - **Sales per day (Mauzo kwa siku)** takes each refund off the day it was given, with a **Refunds (Urejeshaji)** column. The dashboard's two-week chart does the same, so a day's gross profit matches the Sales report for that day.
+  - **Refunds (Urejeshaji wa pesa)** is a new report in **Reports → Sales**. It lists every refund given in the period: when, the receipt number, the day of the sale, the items, how the money went back, whether the items went back in stock, who gave it and why. Use it to find the sale behind a return without opening receipts one by one.
 
 ### EFD (fiscal receipts)
 
@@ -118,8 +126,10 @@ Still to confirm with a real EFD provider: that it accepts the refund note.
 - Books: `Ledger.PostSaleRefund` in `backend/internal/accounting/postings.go`. Posted under source type `sale_void` with `source_id` = the refund id, because the SQLite source-type check cannot be changed safely. Entries carry `source_sale_id` (the sale for both voids and refunds), which the Cash flow page uses for **Open the receipt**.
 - Credit check: `checkCreditRefund` caps a refund to the account by what the sale put on credit (less earlier credit refunds) and by `customers.Service.Balance`.
 - Debt: `customers/repository.go` subtracts `sale_refunds` with `method = 'credit'`.
-- Totals: `refund_total` on `GET /api/sales/totals` (by sale filter); `refund_count` / `refund_total` and net sales in the reports summary (`reports/repository.go`, `reports/service.go`, by refund date).
+- Totals: `refund_total` on `GET /api/sales/totals` (by refund date, with the same shop and receipt filters); `refunded_total` on each row of `GET /api/sales`; `refund_count` / `refund_total` and net sales in the reports summary (`reports/repository.go`, `reports/service.go`, by refund date).
+- Daily: `Repository.Daily` adds a `day_refunds` aggregate; `DayView` has `refund_total` and `net_sales`, and `cost_total` / `gross_profit` are net of refunds. Refunds report: `reports/refunds.go`, `refunds_repository.go`, export `GET /api/reports/refunds/export`.
+- Stock reasons `sale_refund` and `sale_void` (migration 000074 relabels older positive `sale` movements; not in `bookedMovementReasons`, because the refund and void postings book the cost).
 - EFD: `fiscal_refund_notes`; claim waits until the original `fiscal_receipts` row is `sent`; payload `BuildRefundNotePayload` (`document_type: "credit_note"`, `credit_for: "refund"`), idempotency key `<refund id>:refund-note`.
 - Migration 000059: `sale_refunds`, `sale_refund_lines`, `fiscal_refund_notes`.
 - Screens: `frontend/app/components/sales/RefundPanel.vue`, `SaleDetailsDialog.vue`; Takings card in `frontend/app/pages/sales/index.vue`.
-- PRs: balceinv-api #75, balceinv #49. Details: `steps.md`, Phase 33.
+- PRs: balceinv-api #75, balceinv #49. Details: `steps.md`, Phase 33. Reporting fixes: balceinv-api #146, balceinv #117, Phase 52.

@@ -3507,6 +3507,65 @@ The owner heard the two reports give different totals. They did (balceinv-api #1
   3. Change a price in Excel, then upload the file to a **new** company or shop. It must import.
 - Re-importing into the **same** company is refused, because every SKU already exists. The import only adds products; it doesn't update them. Tell the client this.
 
+## Phase 52: refunds clear in reports and stock history (2026-11-13)
+
+### Findings being fixed
+The client asked: when a customer returns an item two days after buying it, where is the return recorded, does stock go up, and does the sales report for the return day show it clearly, linked to the sale?
+- Recording and restocking already worked (Sales → receipt → Refund).
+- **Daily report and dashboard trend** didn't subtract refunds, so the return day showed full takings (`backend/internal/reports/repository.go` `Daily`).
+- **Sales page refund total** summed refunds on sales *made* in the range. A return today for an older sale didn't show when filtering on today (`backend/internal/sales/history_repository.go` `Totals`).
+- **No list of refunds** showed receipt numbers, and the sales list didn't mark refunded receipts (`frontend/app/pages/sales/index.vue`).
+- **Stock history** showed a restocked refund, and a void putting stock back, as **Sale** with a plus quantity (`backend/internal/sales/refund.go`, `service.go`).
+- Order and invoice stock reasons showed raw keys in stock history (`frontend/app/composables/useStock.ts`).
+- Issues: balceinv-api #145, balceinv #116.
+
+### Implementation status
+- [x] **Backend (balceinv-api #146):**
+  - Daily nets refunds per day, with a Refunds column in the document.
+  - New `refunds` report, PDF or Excel, English and Kiswahili.
+  - Sales totals count refunds by refund date. `refunded_total` is on each receipt in the list.
+  - Stock reasons `sale_refund` and `sale_void`. Migration 000074 relabels past movements; on Postgres it lifts FORCE RLS for the update, because the migration owner would otherwise see no rows.
+- [x] **Frontend (balceinv #117):**
+  - Refunded / Part refunded badge in the sales list.
+  - Refunds row on the reports page.
+  - Labels and filter options for the new reasons, and labels for the order and invoice reasons.
+- [x] Docs: `docs/features/refunds.md` updated.
+- [ ] Merged and released.
+
+### Verification performed
+- **Backend:**
+  - `go build ./...` and `go vet ./...` pass.
+  - `go test ./...` on SQLite passes except `internal/config` and `internal/server`. Both fail the same way on `revamp` on Windows (paths).
+  - New `TestARefundCountsOnTheDayItWasGivenAndPointsToItsReceipt` (sale back-dated two days, refunded today) checks:
+    - the sale day is unchanged, and today shows −1000 net sales and −400 gross profit, equal to the summary;
+    - the sales totals for today, and `refunded_total` in the list;
+    - the refunds sheet in English and Kiswahili, plus the PDF;
+    - no refund on the sale day;
+    - the new reasons and the history filter.
+  - New `TestPastReturnsAndVoidsAreRelabelledInTheStockHistory` migrates a filled 000073 SQLite database and checks each relabel.
+  - Postgres runs in CI.
+- **Local server** on a scratch database (one full refund, one part refund, one void):
+  - The list returned `refunded_total` 1000 and 1000, and totals `refund_total` 2000.
+  - Stock history showed `sale_refund` +1 and `sale_void` +2.
+  - The Refunds Excel listed both receipts with method, back-in-stock and reason.
+  - The Daily Excel showed takings 4000, refunds −2000, cost 1800 and gross profit 200.
+- **Frontend:** `node scripts/locales.check.ts` (3195 keys) and `pnpm build` pass.
+- **Not done:** looking at the badge and the Refunds row in the browser. The pane was hidden and stopped rendering.
+
+### Manual follow-up required
+- **After deploy, on a shop with an older refund:** open Stock → History. Past returns must read **Customer return (Mteja amerudisha)**, not Sale. Then check the Postgres relabel worked as `balce_owner`:
+
+  ```sql
+  SELECT COUNT(*) FROM stock_movements WHERE reason = 'sale' AND change > 0;
+  ```
+
+  This must return 0.
+- **In the app:** refund one item from a sale made on an earlier day. Then:
+  - Sales filtered on today shows **Refunds:** with that amount, and the receipt carries the badge.
+  - **Reports → Refunds** lists it with the receipt number.
+  - **Sales per day** shows it on today's row.
+- **Still not netted:** the **Sales per staff** and **Sales per shop** reports still show takings without refunds. Tell the client, or ask whether to net them too.
+
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
   watch it in GitHub Actions.
