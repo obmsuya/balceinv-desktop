@@ -3435,7 +3435,10 @@ The owner heard the two reports give different totals. They did (balceinv-api #1
   - Take payment is the main button and leaves the order where it is. Hand over is separate and asks before the collection date.
   - The locale check works on Windows.
 - [x] Docs: `docs/features/order-drafts-and-payment.md`.
-- [x] Merged (balceinv-api #142, balceinv #113) and released in 2.0.19 (12 Nov 2026).
+- [x] Merged (balceinv-api #142, balceinv #113) and tagged 2.0.19 (12 Nov 2026).
+- [ ] Shipped. The 2.0.19 deploy and release failed at checkout because balceinv-api is now private.
+  - Fix: desktop PR #84, plus a `SUBMODULES_TOKEN` secret from the owner.
+  - Then re-tag v2.0.19.
 
 ### Verification performed
 - **Backend:**
@@ -3466,6 +3469,43 @@ The owner heard the two reports give different totals. They did (balceinv-api #1
   2. Take full payment on a Ready order with a future date. It must stay **Tayari**.
   3. Press **Kabidhi oda**: the date warning must show.
 - Tell staff that **Pokea malipo** is now the button for taking money, and **Kabidhi** is only for when the customer collects.
+
+## Phase 51: export products to Excel (2026-11-13)
+
+### Findings being fixed
+- **"Can one export their products and stock to Excel?"** Only partly.
+  - The Stock on hand report exports to Excel with stock and values (`backend/internal/reports/documents.go` `fillStock`).
+  - Its columns don't match the import template, so the file can't be edited and uploaded back. There was no products export (`backend/internal/server/routes.go`).
+- Issues: balceinv-api #143, balceinv #114.
+
+### Implementation status
+- [x] **Backend (balceinv-api #144):** `GET /api/products/export` (`products:create`, because it carries cost prices). It writes the 12 template columns (`backend/internal/products/export.go`, `export_repository.go`).
+  - Every active product and variant is included; variants are named "Shirt · Large".
+  - Quantity and minStock come from the current shop.
+  - Barcode is the first single-item code.
+  - The template and the export share one stream-writer builder (`import.go` `productsWorkbook`).
+- [x] **Frontend (balceinv #115):** an **Export (Hamisha)** button on Products saves `products-YYYY-MM-DD.xlsx`. The toast fires only after the save (`frontend/app/composables/useProducts.ts`, `pages/products/index.vue`).
+- [x] Docs: `docs/features/products-export.md`.
+- [ ] Merged and released.
+
+### Verification performed
+- **Backend:**
+  - `go build ./...` and `go vet ./...` pass.
+  - `go test ./internal/products/` passes on SQLite, including the new `TestExportedProductsImportIntoAnotherCompany`. It checks:
+    - the exact rows: variant naming, a leading-zero barcode kept as text, a 24-pack barcode left out, the archived product skipped and template defaults;
+    - that the file imports into a fresh company with the same price, cost, stock, wholesale minimum and category;
+    - that a cashier with only `products:view` gets 403.
+  - Postgres runs in CI.
+- **Local backend** (on the phase 50 test shop): `GET /api/products/export` returned 200 with an xlsx content type, and a workbook with a header and 2 product rows.
+- **Frontend:** `node scripts/locales.check.ts` (3188 keys) and `pnpm build` pass.
+- **Not done:** clicking the button in the browser. The pane was hidden and refused localhost.
+
+### Manual follow-up required
+- **On a till or the web app:**
+  1. Open Products and press **Hamisha**. A save dialog must open, and the Tauri native dialog on the desktop.
+  2. Open the file in Excel. Barcodes must keep their leading zeros, and prices must be plain numbers.
+  3. Change a price in Excel, then upload the file to a **new** company or shop. It must import.
+- Re-importing into the **same** company is refused, because every SKU already exists. The import only adds products; it doesn't update them. Tell the client this.
 
 ## Manual follow-up required
 - The first run of "Deploy cloud" happens when this PR merges into `main`;
