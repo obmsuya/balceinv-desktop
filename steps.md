@@ -3657,3 +3657,85 @@ _Collected from the phases above as they complete._
   picker lists it. Also click Template on the products page and in team
   tools: a native save dialog must open and the saved `.xlsx` must open
   in Excel. The browser path is verified; the Tauri save dialog is not.
+
+## Phase 53: client feedback round, purchases first (2026-11-17)
+
+### Findings being fixed
+Client feedback, translated:
+1. Make the report text a little bigger.
+2. Stock arrived can't be changed after saving; only supplier details can be edited.
+3. They want to delete an order they entered and save drafts.
+4. After saving a purchase there is no button to pay it.
+5. Brk lines inflate sales. When the shop brokers for another shop, the full price counts as the shop's own sales.
+
+What the code showed:
+- **Purchase orders** (`backend/internal/suppliers/order_service.go`): a draft could only be marked sent or cancelled. The form defaulted to "Already sent" (`frontend/app/components/suppliers/OrderFormDialog.vue`).
+- **Stock arrived** (`backend/internal/suppliers/purchase_service.go`) had no update route and no draft. The only status values allowed were `received` and `cancelled`.
+- **Pay:** the backend already accepted `purchase_id` on a supplier payment, but `PaySupplierDialog.vue` always sent null. `PurchaseDetailsDialog.vue` had no Pay button, and `StockArrivedDialog.vue` closed on save.
+- **Report fonts:** set as constants in `backend/internal/documents/register_pdf.go`, `statement_pdf.go`, `pdf.go` and `excel_sheet.go`.
+- **Brk:** `sales/winga.go` puts the full line in the sale total. The reports summary, daily, staff and shop figures and the books' Sales account count it as sales, and the Brk share as cost.
+
+Owner decisions:
+- Brk comes out of Sales. Brk takings and Brk commission are shown separately, and profit keeps the commission.
+- The books change for new sales only.
+- Drafts for both orders and Stock arrived.
+- An edit is allowed while the stock left covers the reduction.
+
+Issues:
+- balceinv-api #147 and #148
+- balceinv #120
+
+### Implementation status
+- [x] **Draft purchase orders** (balceinv-api #149): `PUT` and `DELETE /api/purchase-orders/:id`, drafts only. Delete is refused once stock arrived against the order (`order_has_deliveries`).
+- [x] **Stock arrived** (balceinv-api #150, stacked on #149):
+  - Migration 000075: the `purchase_drafts` table and `purchases.replaced_by_purchase_id`.
+  - `PUT /api/purchases/:id` replaces the arrival:
+    - stock moves by the difference;
+    - the average cost is redone;
+    - order quantities move;
+    - the old arrival is cancelled and linked to the new one;
+    - payments move with it.
+  - `/api/purchase-drafts` for drafts.
+  - A payment for one arrival is capped at what it still owes.
+- [x] **Screens** (balceinv #121):
+  - order Save draft / Save as sent, plus Change and Delete;
+  - Stock arrived Save draft, a Drafts list, and Change;
+  - Pay on the arrival; details open after saving one that still owes money;
+  - English and Kiswahili text.
+- [x] Team guide `docs/team/purchases.md`.
+- [ ] **Report fonts:** proposed as its own session ("Make report fonts a little bigger"). Not started.
+- [ ] **Brk out of sales:** proposed as its own session ("Take Brk lines out of sales figures"), with migration 000076 and stacked on #146. Not started.
+- [ ] Merged, desktop submodule pointers moved, released.
+
+### Verification performed
+- **Backend:**
+  - `go build ./...` and `go vet ./...` pass.
+  - `go test ./...` on SQLite passes except `internal/config` and `internal/server`, which fail the same way on `revamp` on Windows.
+  - New tests:
+    - `TestADraftOrderCanBeChangedSentOrDeleted`
+    - `TestEditingStockArrivedMovesOnlyTheDifference`: stock by difference, cost, books balancing, payments moved, the refusals, retry, paying one arrival, a cash arrival
+    - `TestStockArrivedDraftsMoveNothingUntilSaved`
+  - The test run found a bug that was then fixed: retrying an edit was refused as "already cancelled".
+- **Frontend:** `node scripts/locales.check.ts` (3225 keys), `pnpm build` and `pnpm generate` pass.
+- **Local build** (server on a scratch database with the generated frontend, driven headless with playwright-cli; the expired licence status was stubbed in that browser only):
+  - PUR-000001 (54,000, 20,000 paid) showed Pay and Change.
+  - Raising sugar 10 → 12 saved PUR-000002 at 59,200, with 20,000 paid and 39,200 still to pay, linked "Changed from PUR-000001".
+  - Pay prefilled 39,200, refused 40,000, and after paying the arrival showed Paid with no Pay button.
+  - A Stock arrived draft was saved and listed. Continued, it showed the draft notice; saved, it opened PUR-000003 with Pay, and the draft left the list.
+  - Draft order PO-000001: quantity 6 → 10 saved (expected total 95,000), then Delete removed it.
+- **Not done:** Postgres locally (CI runs it), phone width, dark mode, and Kiswahili screens by eye.
+
+### Manual follow-up required
+- **Merge order:** #146 (migration 000074) must merge before #150 (000075). A database already at 75 never runs 74.
+- **On Postgres after deploy, as `balce_owner`:**
+  - open Purchases → Stock arrived;
+  - save a draft;
+  - change a saved arrival.
+
+  `purchase_drafts` has RLS, so check that the draft shows only in its own company.
+- **On a real shop:**
+  1. Change an arrival after selling part of it, lowering a line by more than is left. Check the refusal reads clearly in Kiswahili.
+  2. Lower it by less than is left and check Stock → History shows the difference against the new PUR number.
+- **Tell the client:**
+  - supplier and shop can't be changed in an edit; cancel and re-enter for those;
+  - an edited arrival gets a new number, and the old one stays as "Changed".
