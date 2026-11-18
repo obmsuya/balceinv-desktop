@@ -32,6 +32,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive   # Important because of frontend submodule
+          token: ${{ secrets.SUBMODULES_TOKEN || github.token }}
 
       # 1. Setup Go Environment
       - name: Setup Go
