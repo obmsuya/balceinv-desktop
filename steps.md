@@ -3773,3 +3773,45 @@ Issues:
 - **Tell the client:**
   - supplier and shop can't be changed in an edit; cancel and re-enter for those;
   - an edited arrival gets a new number, and the old one stays as "Changed".
+
+## Phase 54: order deposits on receipts, receipt window on top (2026-11-21)
+
+### Findings being fixed
+- **"The changes are not seen":** v2.0.20 contains the report fonts and the purchase changes (backend `6e95316`, frontend `a0a1d7e`). But the desktop app does not install updates on its own. `UpdateIndicator.vue` shows an icon and a toast, and someone has to press Update. Until then the old bundled backend keeps serving the old reports.
+- **Deposit hidden at handover.** `orders.collectionPayments` merges the order's deposits into the sale payments by method. The PDF (`invoices/service.go` `totalFields`), the thermal receipt (`printing/receipt.go`) and the receipt page (`pages/receipts/[id].vue`) then print the full amount as "Paid".
+- **Receipt window behind other apps.** `usePrint.openBrowserReceipt` opened a plain `WebviewWindow`. With `?print=1` its print dialog could sit behind other applications.
+- **Checked and not changed:**
+  - A credit sale's invoice shows the amount put on credit at the sale. `customer_payments` are not tied to a sale, so the customer statement is where the live balance is.
+  - Invoices (Ankara) already print Paid and Outstanding.
+
+### Implementation status
+- [x] Sale view `deposit_payments` (net per method), and `SaleView.PaidAtCounter()`.
+- [x] PDF and thermal receipt: `Deposit paid earlier (method)` / `Paid now (method)` (sw: `Malipo ya awali` / `Umelipa sasa`).
+- [x] Receipt page and sale details use `paidAtCounter`.
+- [x] Receipt window opens centred, focused, always on top. The browser popup gets `focus()`.
+- [x] PRs and issues:
+  - backend: obmsuya/balceinv-api#158 (issue #157);
+  - frontend: obmsuya/balceinv#125 (issue #124).
+
+### Verification performed
+- **Backend:**
+  - `go build ./...`, `go vet ./...`.
+  - `go test ./...` on SQLite. Only the known Windows failures in `internal/config` and `internal/server`.
+  - New tests cover the PDF totals, the thermal receipt and `deposit_payments` on a collected order.
+- **Frontend:** `node scripts/locales.check.ts` (3245 keys), `pnpm generate`.
+- **Local server, fresh SQLite:**
+  - Order ORD-000001 for 55,000, with deposits of 20,000 mobile and 5,000 cash, handed over for 30,000 cash.
+  - The sale returns both deposits.
+  - `/receipts/:id` reads Deposit paid earlier (Cash) 5,000, Deposit paid earlier (Mobile money) 20,000, Paid now (Cash) 30,000.
+
+### Manual follow-up required
+- **On the client's PC:**
+  1. Click the update icon in the top bar and install v2.0.20 (and the release carrying this phase).
+  2. Check Settings → About shows the new version, then download a report and check the bigger font.
+- **On a Windows desktop with no receipt printer:**
+  1. Open another app full screen, then switch back and make a sale.
+  2. The receipt window and its print dialog must come up in front.
+  3. Repeat on a Mac.
+- **With a thermal printer:**
+  1. Hand over an order that took a deposit.
+  2. The paper receipt must show the deposit lines and "Paid now", with nothing cut at 58 mm.
