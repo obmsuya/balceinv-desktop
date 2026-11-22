@@ -3657,3 +3657,199 @@ _Collected from the phases above as they complete._
   picker lists it. Also click Template on the products page and in team
   tools: a native save dialog must open and the saved `.xlsx` must open
   in Excel. The browser path is verified; the Tauri save dialog is not.
+
+## Phase 53: client feedback round, purchases first (2026-11-17)
+
+### Findings being fixed
+Client feedback, translated:
+1. Make the report text a little bigger.
+2. Stock arrived can't be changed after saving; only supplier details can be edited.
+3. They want to delete an order they entered and save drafts.
+4. After saving a purchase there is no button to pay it.
+5. Brk lines inflate sales. When the shop brokers for another shop, the full price counts as the shop's own sales.
+
+What the code showed:
+- **Purchase orders** (`backend/internal/suppliers/order_service.go`): a draft could only be marked sent or cancelled. The form defaulted to "Already sent" (`frontend/app/components/suppliers/OrderFormDialog.vue`).
+- **Stock arrived** (`backend/internal/suppliers/purchase_service.go`) had no update route and no draft. The only status values allowed were `received` and `cancelled`.
+- **Pay:** the backend already accepted `purchase_id` on a supplier payment, but `PaySupplierDialog.vue` always sent null. `PurchaseDetailsDialog.vue` had no Pay button, and `StockArrivedDialog.vue` closed on save.
+- **Report fonts:** set as constants in `backend/internal/documents/register_pdf.go`, `statement_pdf.go`, `pdf.go` and `excel_sheet.go`.
+- **Brk:** `sales/winga.go` puts the full line in the sale total. The reports summary, daily, staff and shop figures and the books' Sales account count it as sales, and the Brk share as cost.
+
+Owner decisions:
+- Brk comes out of Sales. Brk takings and Brk commission are shown separately, and profit keeps the commission.
+- The books change for new sales only.
+- Drafts for both orders and Stock arrived.
+- An edit is allowed while the stock left covers the reduction.
+
+Issues:
+- balceinv-api #147 and #148
+- balceinv #120
+
+### Implementation status
+- [x] **Draft purchase orders** (balceinv-api #149): `PUT` and `DELETE /api/purchase-orders/:id`, drafts only. Delete is refused once stock arrived against the order (`order_has_deliveries`).
+- [x] **Stock arrived** (balceinv-api #150, stacked on #149):
+  - Migration 000075: the `purchase_drafts` table and `purchases.replaced_by_purchase_id`.
+  - `PUT /api/purchases/:id` replaces the arrival:
+    - stock moves by the difference;
+    - the average cost is redone;
+    - order quantities move;
+    - the old arrival is cancelled and linked to the new one;
+    - payments move with it.
+  - `/api/purchase-drafts` for drafts.
+  - A payment for one arrival is capped at what it still owes.
+- [x] **Screens** (balceinv #121):
+  - order Save draft / Save as sent, plus Change and Delete;
+  - Stock arrived Save draft, a Drafts list, and Change;
+  - Pay on the arrival; details open after saving one that still owes money;
+  - English and Kiswahili text.
+- [x] Team guide `docs/team/purchases.md`.
+- [x] **Report fonts** (balceinv-api #152, closes #151):
+  - PDF text about 1 pt bigger (registers 8.3 → 9.3, tables 8 → 9, statements 9 → 10), and Excel 10 → 11 pt.
+  - `truncateToWidth` now measures the bundled font's real glyph widths, so SKUs and receipt numbers no longer spill into the next column.
+  - Wider columns in Brk and Extra, Stock on hand, Products sold and Stock not selling.
+  - Invoices and receipts keep their sizes but share the truncation and the footer.
+- [x] **Brk out of sales** (balceinv-api #154 closes #153, and balceinv #123; both stacked on #146 / #117):
+  - **Reports and the sales page:** takings, VAT, net sales, cost and units count goods only, with new `brk_total`, `brk_share_total`, `brk_tax` and `brk_commission`. Gross profit = goods profit + Brk commission.
+  - **Books:** new system account `brk_commission` (4050, or 40500 if 4050 is taken). Migration 000076 adds it to companies that already have books. New sale and invoice entries credit Sales with the goods only, credit Brk commission, and no longer book the share as cost.
+  - **Past entries are untouched.** The integrity check takes Brk out of expected Sales only for entries newer than that account.
+  - **API rename:** `winga_total` / `winga_share_total` become `brk_*`.
+- [ ] Merged, desktop submodule pointers moved, released.
+
+### Verification performed
+- **Backend:**
+  - `go build ./...` and `go vet ./...` pass.
+  - `go test ./...` on SQLite passes except `internal/config` and `internal/server`, which fail the same way on `revamp` on Windows.
+  - New tests:
+    - `TestADraftOrderCanBeChangedSentOrDeleted`
+    - `TestEditingStockArrivedMovesOnlyTheDifference`: stock by difference, cost, books balancing, payments moved, the refusals, retry, paying one arrival, a cash arrival
+    - `TestStockArrivedDraftsMoveNothingUntilSaved`
+  - The test run found a bug that was then fixed: retrying an edit was refused as "already cancelled".
+- **Frontend:** `node scripts/locales.check.ts` (3225 keys), `pnpm build` and `pnpm generate` pass.
+- **Local build** (server on a scratch database with the generated frontend, driven headless with playwright-cli; the expired licence status was stubbed in that browser only):
+  - PUR-000001 (54,000, 20,000 paid) showed Pay and Change.
+  - Raising sugar 10 → 12 saved PUR-000002 at 59,200, with 20,000 paid and 39,200 still to pay, linked "Changed from PUR-000001".
+  - Pay prefilled 39,200, refused 40,000, and after paying the arrival showed Paid with no Pay button.
+  - A Stock arrived draft was saved and listed. Continued, it showed the draft notice; saved, it opened PUR-000003 with Pay, and the draft left the list.
+  - Draft order PO-000001: quantity 6 → 10 saved (expected total 95,000), then Delete removed it.
+- **Report fonts (#152):**
+  - `go build`, `go vet` and the documents, reports, invoices, accounting, customers and suppliers tests pass; CI is green.
+  - New `TestTruncateToWidthKeepsWideTextInsideTheColumn`.
+  - All 8 reports were rendered before and after with long names, and each PDF was looked at; `BALCE_REPORT_SAMPLES_DIR` re-renders them.
+- **Brk (#154):**
+  - `go test ./...` on SQLite passes, apart from the two Windows failures above.
+  - New tests:
+    - Brk split rounding;
+    - a VAT-registered Brk sale matching across books, the sales report and Profit and loss;
+    - the integrity check across the cut-over;
+    - 000076 up and down on a filled SQLite database.
+  - **Local VAT shop** (3 rice at 10,070 plus a 15,005 Brk line with a 10,000 share):
+    - takings 30,210, net 25,602, Brk commission 2,716;
+    - gross profit 10,318, cash 45,215;
+    - integrity difference 0.
+  - Postgres CI was pending when this was written.
+- **Main session review:** both diffs read. 000076 lifts and restores FORCE RLS on Postgres and is safe to run twice. The sale entry balances (cash = Sales + Brk commission + VAT + share paid out).
+- **Not done:** Postgres locally (CI runs it), phone width, dark mode, and Kiswahili screens by eye.
+
+### Manual follow-up required
+- **Merge order into `revamp`** (migrations 000074 → 000076 must land in order):
+  1. api #146, web #117
+  2. api #149, api #150, web #121
+  3. api #152, web #119
+  4. api #154 and web #123, after retargeting them to `revamp`
+
+  Then one desktop PR moves the submodule pointers to `main`, and v2.0.20 is tagged. That needs `SUBMODULES_TOKEN` in the desktop repo first (only obmsuya can add it), then #84 merged.
+- **Brk after deploy:**
+  - **Tell the client:** today's sales no longer include Brk lines, so totals before and after the update are counted differently. Brk shows on its own line, with the commission in profit.
+  - **Check the EFD receipt** of a Brk sale on a VAT-registered client. It should be unchanged.
+- **On Postgres after deploy, as `balce_owner`:**
+  - open Purchases → Stock arrived;
+  - save a draft;
+  - change a saved arrival.
+
+  `purchase_drafts` has RLS, so check that the draft shows only in its own company.
+- **On a real shop:**
+  1. Change an arrival after selling part of it, lowering a line by more than is left. Check the refusal reads clearly in Kiswahili.
+  2. Lower it by less than is left and check Stock → History shows the difference against the new PUR number.
+- **Tell the client:**
+  - supplier and shop can't be changed in an edit; cancel and re-enter for those;
+  - an edited arrival gets a new number, and the old one stays as "Changed".
+
+## Phase 54: order deposits on receipts, receipt window on top (2026-11-21)
+
+### Findings being fixed
+- **"The changes are not seen":** v2.0.20 contains the report fonts and the purchase changes (backend `6e95316`, frontend `a0a1d7e`). But the desktop app does not install updates on its own. `UpdateIndicator.vue` shows an icon and a toast, and someone has to press Update. Until then the old bundled backend keeps serving the old reports.
+- **Deposit hidden at handover.** `orders.collectionPayments` merges the order's deposits into the sale payments by method. The PDF (`invoices/service.go` `totalFields`), the thermal receipt (`printing/receipt.go`) and the receipt page (`pages/receipts/[id].vue`) then print the full amount as "Paid".
+- **Receipt window behind other apps.** `usePrint.openBrowserReceipt` opened a plain `WebviewWindow`. With `?print=1` its print dialog could sit behind other applications.
+- **Checked and not changed:**
+  - A credit sale's invoice shows the amount put on credit at the sale. `customer_payments` are not tied to a sale, so the customer statement is where the live balance is.
+  - Invoices (Ankara) already print Paid and Outstanding.
+
+### Implementation status
+- [x] Sale view `deposit_payments` (net per method), and `SaleView.PaidAtCounter()`.
+- [x] PDF and thermal receipt: `Deposit paid earlier (method)` / `Paid now (method)` (sw: `Malipo ya awali` / `Umelipa sasa`).
+- [x] Receipt page and sale details use `paidAtCounter`.
+- [x] Receipt window opens centred, focused, always on top. The browser popup gets `focus()`.
+- [x] PRs and issues:
+  - backend: obmsuya/balceinv-api#158 (issue #157);
+  - frontend: obmsuya/balceinv#125 (issue #124).
+
+### Verification performed
+- **Backend:**
+  - `go build ./...`, `go vet ./...`.
+  - `go test ./...` on SQLite. Only the known Windows failures in `internal/config` and `internal/server`.
+  - New tests cover the PDF totals, the thermal receipt and `deposit_payments` on a collected order.
+- **Frontend:** `node scripts/locales.check.ts` (3245 keys), `pnpm generate`.
+- **Local server, fresh SQLite:**
+  - Order ORD-000001 for 55,000, with deposits of 20,000 mobile and 5,000 cash, handed over for 30,000 cash.
+  - The sale returns both deposits.
+  - `/receipts/:id` reads Deposit paid earlier (Cash) 5,000, Deposit paid earlier (Mobile money) 20,000, Paid now (Cash) 30,000.
+
+### Manual follow-up required
+- **On the client's PC:**
+  1. Click the update icon in the top bar and install v2.0.21, which carries this phase (released 2026-11-22).
+  2. Check Settings → About shows the new version, then download a report and check the bigger font.
+- **On a Windows desktop with no receipt printer:**
+  1. Open another app full screen, then switch back and make a sale.
+  2. The receipt window and its print dialog must come up in front.
+  3. Repeat on a Mac.
+- **With a thermal printer:**
+  1. Hand over an order that took a deposit.
+  2. The paper receipt must show the deposit lines and "Paid now", with nothing cut at 58 mm.
+
+## Phase 55: new companies start with the essentials on (2026-11-22)
+
+### Findings being fixed
+- **Everything started off.** A new company had every feature off and `accounting_mode = off`. `features.Repository.Find` falls back to `features.Defaults` when the company has no row. So a new shop had to find Settings → Features before suppliers, customers, credit sales or the books worked.
+- **Owner's decision:**
+  - Suppliers + purchase orders, customers + credit sales, and simple accounting are on for **new companies only**, with the books started on the day the company is created.
+  - The client turns off what is too much.
+  - Customer orders, invoices (Ankara) and Brk stay off.
+
+### Implementation status
+- [x] `features.ForNewCompany`, and `accounting.StartBooksForNewCompany`: `accounting_settings` with `start_mode = today`, plus the seeded chart.
+- [x] **`tenancy.CreateCompany` applies both.** It is used by desktop first setup, cloud sign-up and `cmd/admin`.
+- [x] **`tenancy.CreateBareCompany` keeps the old all-off company.** The old-desktop import uses it, because its history and stock arrive after the company exists. So does the test harness.
+- [x] No migration. Existing companies keep exactly what they have.
+- [x] The Settings and Features tour steps say what a new shop starts with (en and sw).
+- [x] PRs and issues:
+  - backend: obmsuya/balceinv-api#160 (issue #159);
+  - frontend: obmsuya/balceinv#127 (issue #126).
+
+### Verification performed
+- **Backend:**
+  - `go build ./...`, `go vet ./...`.
+  - `go test ./...` on SQLite. Only the known Windows failures in `internal/config` and `internal/server`.
+  - New `internal/tenancy/new_company_test.go`:
+    - `/api/setup` gives the four features on, `accounting_mode = simple`, and the books started today;
+    - the owner can turn accounting and credit off;
+    - a bare company stays all off.
+- **Frontend:** `node scripts/locales.check.ts` (3245 keys each).
+- **Postgres:** runs in the backend PR's CI.
+
+### Manual follow-up required
+- **New install, after this ships:**
+  1. Run first setup on a clean desktop.
+  2. Settings → Features must show suppliers, purchase orders, customers and credit sales on, and accounting Simple.
+  3. Books must open without a "Start books" step.
+  4. Make a cash sale and check it appears in the books.
+- **Existing client after updating:** Settings → Features must be unchanged.
