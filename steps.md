@@ -3806,7 +3806,7 @@ Issues:
 
 ### Manual follow-up required
 - **On the client's PC:**
-  1. Click the update icon in the top bar and install v2.0.20 (and the release carrying this phase).
+  1. Click the update icon in the top bar and install v2.0.21, which carries this phase (released 2026-11-22).
   2. Check Settings → About shows the new version, then download a report and check the bigger font.
 - **On a Windows desktop with no receipt printer:**
   1. Open another app full screen, then switch back and make a sale.
@@ -3815,3 +3815,41 @@ Issues:
 - **With a thermal printer:**
   1. Hand over an order that took a deposit.
   2. The paper receipt must show the deposit lines and "Paid now", with nothing cut at 58 mm.
+
+## Phase 55: new companies start with the essentials on (2026-11-22)
+
+### Findings being fixed
+- **Everything started off.** A new company had every feature off and `accounting_mode = off`. `features.Repository.Find` falls back to `features.Defaults` when the company has no row. So a new shop had to find Settings → Features before suppliers, customers, credit sales or the books worked.
+- **Owner's decision:**
+  - Suppliers + purchase orders, customers + credit sales, and simple accounting are on for **new companies only**, with the books started on the day the company is created.
+  - The client turns off what is too much.
+  - Customer orders, invoices (Ankara) and Brk stay off.
+
+### Implementation status
+- [x] `features.ForNewCompany`, and `accounting.StartBooksForNewCompany`: `accounting_settings` with `start_mode = today`, plus the seeded chart.
+- [x] **`tenancy.CreateCompany` applies both.** It is used by desktop first setup, cloud sign-up and `cmd/admin`.
+- [x] **`tenancy.CreateBareCompany` keeps the old all-off company.** The old-desktop import uses it, because its history and stock arrive after the company exists. So does the test harness.
+- [x] No migration. Existing companies keep exactly what they have.
+- [x] The Settings and Features tour steps say what a new shop starts with (en and sw).
+- [x] PRs and issues:
+  - backend: obmsuya/balceinv-api#160 (issue #159);
+  - frontend: obmsuya/balceinv#127 (issue #126).
+
+### Verification performed
+- **Backend:**
+  - `go build ./...`, `go vet ./...`.
+  - `go test ./...` on SQLite. Only the known Windows failures in `internal/config` and `internal/server`.
+  - New `internal/tenancy/new_company_test.go`:
+    - `/api/setup` gives the four features on, `accounting_mode = simple`, and the books started today;
+    - the owner can turn accounting and credit off;
+    - a bare company stays all off.
+- **Frontend:** `node scripts/locales.check.ts` (3245 keys each).
+- **Postgres:** runs in the backend PR's CI.
+
+### Manual follow-up required
+- **New install, after this ships:**
+  1. Run first setup on a clean desktop.
+  2. Settings → Features must show suppliers, purchase orders, customers and credit sales on, and accounting Simple.
+  3. Books must open without a "Start books" step.
+  4. Make a cash sale and check it appears in the books.
+- **Existing client after updating:** Settings → Features must be unchanged.
